@@ -18,9 +18,9 @@ def analysis(path, name, list, json_file, check_file, target_name=None):
     if check_calc_done(list):
         print(f"calculation of {name} has been completed.")
         if name == "cpd":
-            subprocess.run([f"sh {home}/support_library/analysis_{name}.sh {target_name}"], shell=True)
+            subprocess.run([f"sh {home}/pise/analysis_{name}.sh {target_name}"], shell=True)
         else:
-            subprocess.run([f"sh {home}/support_library/analysis_{name}.sh"], shell=True)
+            subprocess.run([f"sh {home}/pise/analysis_{name}.sh"], shell=True)
         if os.path.isfile(check_file):
             json_file[name] = True
             flag = True

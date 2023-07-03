@@ -14,7 +14,7 @@ args = parser.parse_args()
 #defaults
 functional = args.functional
 home = os.environ['HOME']
-shell_scripts_path =f"{home}/support_library"
+shell_scripts_path =f"{home}/pise"
 dopant_list = args.dopant_list
 substitution_target = args.substitution_target
 

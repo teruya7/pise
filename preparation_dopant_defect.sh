@@ -9,7 +9,7 @@ system=ito
 function prepare_job_script(){
     resource=4
     job_script_name=run6.4.1_"$resource".sh
-    cp "$HOME"/support_library/"$system"/"$job_script_name" ./
+    cp "$HOME"/pise/"$system"/"$job_script_name" ./
     touch ready_for_submission.txt
 }
 
