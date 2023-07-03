@@ -1,0 +1,14 @@
+outcar: OUTCAR-finish
+contcar: POSCAR-finish
+overridden_potcar: Ga
+xc: pbesol
+
+user_incar_settings:
+  LWAVE: True
+  LREAL: False
+  ENCUT: 520
+
+options:
+  set_hubbard_u: True
+
+

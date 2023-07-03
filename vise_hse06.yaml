@@ -1,0 +1,14 @@
+outcar: OUTCAR-finish
+contcar: POSCAR-finish
+overridden_potcar: Ga
+xc: hse
+
+user_incar_settings:
+  LWAVE: True
+  LREAL: False
+  ENCUT: 520
+  ALGO: Normal
+  NSW: 50
+
+
+
