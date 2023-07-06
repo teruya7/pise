@@ -4,11 +4,13 @@ import os
 import subprocess
 import argparse
 import delete_duplication
+import preparation_info
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--functional', default = "pbesol")
 parser.add_argument('-d', '--dopant_list', nargs="*", default = None)
 parser.add_argument('-s', '--substitution_target', default = None)
+parser.add_argument('-r', '--repreparation_list', nargs="*", default = None)
 args = parser.parse_args()
 
 #defaults
@@ -17,6 +19,7 @@ home = os.environ['HOME']
 shell_scripts_path =f"{home}/pise"
 dopant_list = args.dopant_list
 substitution_target = args.substitution_target
+repreparation_list = args.repreparation_list
 
 #preparation_listを準備
 if functional=="pbesol":
@@ -66,6 +69,7 @@ for material in target_list:
         calc_info = json.load(f)
     
     #unitcellの計算インプットの準備
+    preparation_info.repreparation("unitcell",repreparation_list,preparation_info_dict)
     if calc_info["unitcell"]["opt"] and not preparation_info_dict["unitcell"]:
         subprocess.run([f"sh {shell_scripts_path}/preparation_unitcell.sh"], shell=True)
         preparation_info_dict["unitcell"] = True
@@ -76,6 +80,7 @@ for material in target_list:
         print("Preparation of unitcell has already done")
     
     #cpdの計算インプットの準備
+    preparation_info.repreparation("cpd",repreparation_list,preparation_info_dict)
     if not preparation_info_dict["cpd"]:     
         if composition==2:
             subprocess.run([f"sh {shell_scripts_path}/preparation_cpd.sh {element1} {element2}"], shell=True)
@@ -89,6 +94,7 @@ for material in target_list:
         print("Preparation of cpd has already done")
 
     #defectの計算インプットの準備
+    preparation_info.repreparation("defect",repreparation_list,preparation_info_dict)
     if calc_info["unitcell"]["dos"] and not preparation_info_dict["defect"]:
         subprocess.run([f"sh {shell_scripts_path}/preparation_defect.sh"], shell=True)
         preparation_info_dict["defect"] = True
@@ -99,6 +105,7 @@ for material in target_list:
         print("Preparation of defect has already done")
 
     #band_nscの計算インプットの準備
+    preparation_info.repreparation("band_nsc",repreparation_list,preparation_info_dict)
     if calc_info["unitcell"]["band"] and calc_info["unitcell"]["dielectric_rpa"] and not preparation_info_dict["band_nsc"]:
         #_info.jsonを読み込み。
         if os.path.isfile('aexx_info.json'):
@@ -124,6 +131,7 @@ for material in target_list:
     else:
         for dopant in dopant_list:
             #cpdの計算インプットの準備
+            preparation_info.repreparation(f"{dopant}_cpd",repreparation_list,preparation_info_dict)
             if not preparation_info_dict[f"{dopant}_cpd"]:
                 if composition==2:
                     subprocess.run([f"sh {shell_scripts_path}/preparation_dopant_cpd.sh {dopant} {element1} {element2}"], shell=True)
@@ -136,9 +144,10 @@ for material in target_list:
             else:
                 print(f"Preparation of {dopant}_cpd has already done")
             #cpd内の重複を削除
-            delete_duplication.delete_duplication("cpd", f"{dopant}/cpd")
+            delete_duplication.delete_duplication("cpd", f"dopant_{dopant}/cpd")
 
             #defectの計算インプットの準備
+            preparation_info.repreparation(f"{dopant}_defect",repreparation_list,preparation_info_dict)
             if preparation_info_dict["defect"] and not preparation_info_dict[f"{dopant}_defect"]:
                 subprocess.run([f"sh {shell_scripts_path}/preparation_dopant_defect.sh {dopant} {substitution_target}"], shell=True)
                 preparation_info_dict[f"{dopant}_defect"] = True

@@ -2,7 +2,7 @@ import os
 import json
 from pptx import Presentation
 import pptx_functions
-from extra_info import make_extra_info_json
+from supercell_info import make_supercell_info_json
 from effective_mass import revise_effective_mass_json
 import argparse 
 
@@ -50,7 +50,7 @@ for material in target_list:
         pptx_functions.make_slide_with_image(prs,"supercell","../defect")
 
         os.chdir("perfect")
-        make_extra_info_json()
+        make_supercell_info_json()
         pptx_functions.make_slide_with_data(prs,"extra_info.yaml","./")
 
         os.chdir("../")

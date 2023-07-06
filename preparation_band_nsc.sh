@@ -2,13 +2,10 @@
 
 AEXX="$1"
 
-#利用しているスパコンを指定
-system=ito
+source "$HOME"/pise/conf.txt
 
 function prepare_job_script(){
-    resource=4
-    job_script_name=run6.4.1_"$resource".sh
-    cp "$HOME"/pise/"$system"/"$job_script_name" ./
+    cp "$HOME"/pise/"$system"/"$job_script_name_4" ./
     touch ready_for_submission.txt
 }
 
