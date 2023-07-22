@@ -1,0 +1,31 @@
+#Materials projectのAPI key
+MY_API_KEY: 0eILTXiS0OgkMkbDYBBLIBiq4PSyJ4wo
+path_to_poscar: /home/usr1/r70391a/poscar
+
+#スパコンの環境変数の設定
+limit_jobs: 128
+num_jobs_command: pjstat |awk '{print $10}'| awk 'NR==3'
+submit_command: pjsub
+submission_ready: ready_for_submission.txt
+job_script_path: /home/usr1/r70391a/scripts
+
+#job_scriptの設定
+job_script_small: run6.4.1_1.sh
+small_task: ["opt", "band", "dos", "abs"]
+job_script_large: run6.4.1_4.sh
+large_task: ["defect", "dielectric", "dielectric_rpa", "band_nsc"]
+
+
+#vise_task_commandの設定
+vise_task_command_opt: vise vs -uis ENCUT 520
+vise_task_command_band: vise vs -t band -pd ../opt
+vise_task_command_band_nsc: vise vs -t band -pd ../opt -x pbe0 -uis ALGO Subrot NELM 1 HFRCUT -1 AEXX
+vise_task_command_dos: vise vs -t dos -pd ../opt -uis LVTOT True LAECHG True KPAR 1
+vise_task_command_dielectric: vise vs -t dielectric_finite_field -pd ../opt -uis IBRION 6
+vise_task_command_dielectric_rpa: vise vs -t dielectric_dfpt -pd ../opt -uis LRPA True
+vise_task_command_dielectric_hybrid: vise vs -t dielectric_finite_field -d ../opt -uis IBRION 6
+vise_task_command_abs: vise vs -t dielectric_function -pd ../opt
+vise_task_command_defect: vise vs -t defect -uis SYMPREC 1e-4 --options only_even_num_kpts True
+
+#マウントした時のlocalのパス
+local_path: /Users/teruyanagafuji/mnt/ito

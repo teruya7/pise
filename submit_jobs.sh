@@ -1,16 +1,14 @@
 #!/bin/bash
 
 name="$1"
-functional="$2"
+functional="${2:-pbesol}"
 
-#利用しているスパコンを指定
-system=ito
+source "$HOME"/pise/conf.txt
 
-if [ $system = ito]; then
-    num_jobs=$(pjstat |awk '{print $10}'| awk 'NR==3')
+if [ $system = ito ]; then  
     limit_jobs=128
     submit_command=pjsub
-elif [ $system = laurel]; then
+elif [ $system = laurel ]; then
     num_jobs=$(qgroup | grep Nagafuji | awk '{print$6}' | sed 's/[(]//g')
     limit_jobs=1800
     submit_command=sbatch
@@ -21,6 +19,13 @@ function submission(){
         cd $1
         for i in */
         do
+            if [ $system = ito ]; then  
+                num_jobs=$(pjstat |awk '{print $10}'| awk 'NR==3')
+            elif [ $system = laurel ]; then
+                num_jobs=$(qgroup | grep Nagafuji | awk '{print$6}' | sed 's/[(]//g')
+            fi
+            
+            echo $num_jobs
             if [ $num_jobs -ge $limit_jobs ]; then
                 echo "The maximum number of calculations has been reached."
                 break
@@ -29,8 +34,13 @@ function submission(){
             echo $i
             cd $i
             if [ -e ready_for_submission.txt ]; then
-                $submit_command run6.4.1_*.sh
-                rm ready_for_submission.txt
+                if [ -e WAVECAR ]; then
+                    $submit_command $job_script_name_4
+                    rm ready_for_submission.txt
+                else
+                    $submit_command $2
+                    rm ready_for_submission.txt
+                fi
             else
                 echo "no ready_for_submission.txt"
             fi
@@ -42,14 +52,14 @@ function submission(){
 
 cd "$name"/"$functional"/
 
-submission unitcell
-submission cpd
-submission defect
+# submission unitcell $job_script_name_1
+# submission cpd $job_script_name_1
+submission defect $job_script_name_4
 
 for i in dopant_*/ 
 do 
     cd $i
-    submission cpd
-    submission defect
+    # submission cpd $job_script_name_1
+    submission defect $job_script_name_4
     cd ../
 done

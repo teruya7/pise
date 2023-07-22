@@ -1,5 +1,8 @@
 import os
-
+import json
+from collections import defaultdict
+from pise_set import PiseSet
+from target_info import TargetHandler
 
 #ディレクトリのリストを作成
 def make_dir_list():
@@ -11,7 +14,7 @@ def make_dir_list():
     return list
 
 #計算が終わったかどうかを確認
-def check_calculation(path):
+def check_calc_done(path):
     try:
         os.chdir(path)
         if os.path.isfile("vasprun.xml"):
@@ -33,40 +36,69 @@ def check_calculation(path):
     except FileNotFoundError:
         return False
 
-#calc_infoのデータを作成
-def make_calculation_info(path, data_dict, list=None, dopant=None):
-    if os.path.isdir(path):
-        os.chdir(path)
-        if list is None:
+#target_dirのsub_dirの計算が終わったかの情報をcalc_infoに記録
+def update_calc_info(target_dir, calc_info, unitcell_list=None, dopant=None):
+    if os.path.isdir(target_dir):
+        os.chdir(target_dir)
+        if unitcell_list is None:
             if dopant is None:
-                tmp_list = make_dir_list()
-                for i in tmp_list:
-                    if check_calculation(i):
-                        data_dict[path][i] = True
+                dir_list = make_dir_list()
+                for sub_dir in dir_list:
+                    if check_calc_done(sub_dir):
+                        calc_info[target_dir][sub_dir] = True
                     else:
-                        data_dict[path][i] = False
+                        calc_info[target_dir][sub_dir] = False
             else:
-                tmp_list = make_dir_list()
-                for i in tmp_list:
-                    if check_calculation(i):
-                        data_dict[path + "_" + dopant][i] = True
+                dir_list = make_dir_list()
+                for sub_dir in dir_list:
+                    if check_calc_done(sub_dir):
+                        calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = True
                     else:
-                        data_dict[path + "_" + dopant][i] = False
+                        calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = False
         else:
-            if dopant is None:
-                for i in list:
-                    if check_calculation(i):
-                        data_dict[path][i] = True
-                    else:
-                        data_dict[path][i] = False
-            else:
-                for i in list:
-                    if check_calculation(i):
-                        data_dict[path + "_" + dopant][i] = True
-                    else:
-                        data_dict[path + "_" + dopant][i] = False
+            for unitcell_dir in unitcell_list:
+                if check_calc_done(unitcell_dir):
+                    calc_info[target_dir][unitcell_dir] = True
+                else:
+                    calc_info[target_dir][unitcell_dir] = False
         os.chdir("../")
-    return data_dict
+    return calc_info
 
+class CalcInfoMaker():
+    def __init__(self):
+
+        #pise.yamlとtarget_info.jsonの読み込み
+        piseset = PiseSet()
+
+        for target in piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+                
+                #calc_info.jsonを初期化
+                calc_info = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+
+                #calc_info.jsonの更新    
+                update_calc_info("unitcell", calc_info, piseset.unitcell)
+                update_calc_info("cpd", calc_info)
+                update_calc_info("defect", calc_info)
+                for dopant in piseset.dopants:
+                    if os.path.isdir(f"dopant_{dopant}"):
+                        os.chdir(f"dopant_{dopant}")
+                        update_calc_info("cpd", calc_info, dopant=dopant)
+                        update_calc_info("defect", calc_info, dopant=dopant)
+                        os.chdir("../")
+
+                #calc_info.jsonの保存
+                with open("calc_info.json", "w") as f:
+                    json.dump(calc_info, f, indent=4)
+
+                os.chdir("../../")
+                print()
+            else:
+                print(f"No such directory: {path}")
+                print()
+        
 if __name__ == '__main__':
-    print("これは自作モジュールです")
+    print()
