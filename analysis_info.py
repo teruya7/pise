@@ -296,7 +296,10 @@ class AnalysisInfoMaker():
 
         #analysis_target_listを作成
         analysis_target_list = ["unitcell","cpd", "defect"]
-        if piseset.dopants is not None:
+        print(piseset.dopants)
+        if piseset.dopants is None:
+            print("No dopant is considered.")
+        else:
             for dopant in piseset.dopants:
                 analysis_target_list.append(f"{dopant}_cpd")
                 analysis_target_list.append(f"{dopant}_defect")
@@ -316,7 +319,9 @@ class AnalysisInfoMaker():
                 analysis_info["unitcell"] = analysis_unitcell(piseset, calc_info, analysis_info)
                 analysis_info["cpd"] = analysis_cpd(target_material, calc_info, analysis_info)
                 analysis_info["defect"] = analysis_defect(calc_info, analysis_info)
-                if piseset.dopants is not None:
+                if piseset.dopants is None:
+                    print("No dopant is considered.")
+                else:
                     for dopant in piseset.dopants:
                         analysis_info[f"{dopant}_cpd"] = analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info)
                         analysis_info[f"{dopant}_defect"] = analysis_dopant_defect(dopant, calc_info, analysis_info)

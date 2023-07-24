@@ -30,7 +30,7 @@ class TargetInfoMaker():
 
         #pise_defaults.yamからAPIキーを読み込む
         home = home = os.environ['HOME']
-        with open(f"{home}/pise/pise_defaults.yaml") as file:
+        with open(f"{home}/.pise_defaults.yaml") as file:
             pise_defaults = yaml.safe_load(file)
             MY_API_KEY = pise_defaults["MY_API_KEY"]
             self.api_key = MY_API_KEY

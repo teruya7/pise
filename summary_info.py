@@ -87,8 +87,9 @@ class SummuryInfoMaker():
 
                     #競合相のラベルの取得
                     summary_info["labels"] = get_label_from_chempotdiag("cpd/chem_pot_diag.json")
-                    for dopant in piseset.dopants:
-                        summary_info[dopant]["labels"] = get_label_from_chempotdiag(f"dopant_{dopant}/cpd/chem_pot_diag.json")
+                    if piseset.dopants is not None:
+                        for dopant in piseset.dopants:
+                            summary_info[dopant]["labels"] = get_label_from_chempotdiag(f"dopant_{dopant}/cpd/chem_pot_diag.json")
                         
 
                     #summary_info.jsonの保存

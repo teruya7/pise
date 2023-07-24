@@ -83,12 +83,13 @@ class CalcInfoMaker():
                 update_calc_info("unitcell", calc_info, piseset.unitcell)
                 update_calc_info("cpd", calc_info)
                 update_calc_info("defect", calc_info)
-                for dopant in piseset.dopants:
-                    if os.path.isdir(f"dopant_{dopant}"):
-                        os.chdir(f"dopant_{dopant}")
-                        update_calc_info("cpd", calc_info, dopant=dopant)
-                        update_calc_info("defect", calc_info, dopant=dopant)
-                        os.chdir("../")
+                if piseset.dopants is not None:
+                    for dopant in piseset.dopants:
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
+                            update_calc_info("cpd", calc_info, dopant=dopant)
+                            update_calc_info("defect", calc_info, dopant=dopant)
+                            os.chdir("../")
 
                 #calc_info.jsonの保存
                 with open("calc_info.json", "w") as f:

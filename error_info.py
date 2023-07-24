@@ -45,12 +45,13 @@ class ErrorInfoMaker():
                 update_error_info("unitcell", error_info, piseset.unitcell)
                 update_error_info("cpd", error_info)
                 update_error_info("defect", error_info)
-                for dopant in piseset.dopants:
-                    if os.path.isdir(f"dopant_{dopant}"):
-                        os.chdir(f"dopant_{dopant}")
-                        update_error_info("cpd", error_info, dopant=dopant)
-                        update_error_info("defect", error_info, dopant=dopant)
-                        os.chdir("../")
+                if piseset.dopants is not None:
+                    for dopant in piseset.dopants:
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
+                            update_error_info("cpd", error_info, dopant=dopant)
+                            update_error_info("defect", error_info, dopant=dopant)
+                            os.chdir("../")
 
                 #error_info.jsonの保存
                 with open("error_info.json", "w") as f:
