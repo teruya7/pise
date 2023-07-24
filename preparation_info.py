@@ -69,10 +69,12 @@ def prepare_job_script(piseset, task_name):
 
 def prepare_input_files(piseset, target_dir, vise_task_command, task_name):
     if not os.path.isdir(task_name):
+        print(f"Preparing {target_dir}.")
         os.makedirs(target_dir, exist_ok=True)
         os.chdir(target_dir)
-        subprocess.run([vise_task_command], shell=True)
-        prepare_job_script(piseset, task_name)
+        if not check_preparation_done():
+            prepare_job_script(piseset, task_name)
+            subprocess.run([vise_task_command], shell=True)
         os.chdir("../")
     else:
         print(f"{task_name} has already prepared.")
@@ -89,15 +91,17 @@ def preparation_opt(piseset, material_id, formula_pretty):
 
         os.chdir("unitcell/opt")
         if material_id is not None:
-            subprocess.run([f"vise gp -m {material_id}"], shell=True)
-            subprocess.run([piseset.vise_task_command_opt], shell=True)
-            prepare_job_script(piseset, "opt")
+            if not check_preparation_done():
+                subprocess.run([f"vise gp -m {material_id}"], shell=True)
+                prepare_job_script(piseset, "opt")
+                subprocess.run([piseset.vise_task_command_opt], shell=True)
         else:
             cwd = os.getcwd()
-            shutil.copy(f"{piseset.path_to_poscar}/{formula_pretty}_POSCAR", cwd)
-            subprocess.run([piseset.vise_task_command_opt], shell=True)
-            prepare_job_script(piseset, "opt")
-
+            if not check_preparation_done():
+                shutil.copy(f"{piseset.path_to_poscar}/{formula_pretty}_POSCAR", cwd)
+                prepare_job_script(piseset, "opt")
+                subprocess.run([piseset.vise_task_command_opt], shell=True)
+            
 def preparation_unitcell(piseset, calc_info, preparation_info):
     if not preparation_info["unitcell"] and calc_info["unitcell"]["opt"]:
         print("Preparing unitcell.")
@@ -135,9 +139,10 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
             vise_yaml["options"]["set_hubbard_u"] = False
             yaml.dump(vise_yaml, f, sort_keys=False)
 
-        subprocess.run([f"{piseset.vise_task_command_band_nsc} {aexx}"], shell=True)
-        subprocess.run(["cp ../band/WAVECAR ./"], shell=True)
-        prepare_job_script(piseset, "band_nsc")
+        if not check_preparation_done():
+            prepare_job_script(piseset, "band_nsc")
+            subprocess.run([f"{piseset.vise_task_command_band_nsc} {aexx}"], shell=True)
+            subprocess.run(["cp ../band/WAVECAR ./"], shell=True)
         os.chdir("../../")
 
         #aexx_info.jsonに保存
@@ -313,7 +318,6 @@ class PreparationInfoMaker():
                 if piseset.functional == "pbesol":
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
 
-                if self.piseset.dopants is not None:
                     if piseset.dopants is not None:
                         for dopant in piseset.dopants:
                             preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)

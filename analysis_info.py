@@ -3,6 +3,7 @@ import subprocess
 from pise_set import PiseSet
 from collections import defaultdict
 import json
+import yaml
 from target_info import TargetHandler
 from calc_info import CalcInfoMaker
 from pdf2image import convert_from_path
@@ -105,13 +106,13 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
 
             os.chdir("../")
         elif not calc_info["unitcell"][band]:
-            print(f"{band} calculations have not finished yet.")
+            print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
             flag = False
         elif not calc_info["unitcell"]["dos"]:
-            print("dos calculations have not finished yet.")
+            print("dos calculations have not finished yet. So analysis of unitcell will be skipped.")
             flag = False
         elif not calc_info["unitcell"]["abs"]:
-            print("abs calculations have not finished yet.")
+            print("abs calculations have not finished yet. So analysis of unitcell will be skipped.")
             flag = False
     else:
         print("Analysis of unitcell has already finished.")
@@ -131,12 +132,23 @@ def analysis_cpd(target_material, calc_info, analysis_info):
             subprocess.run(["pydefect sre"], shell=True)
             subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
             flag = check_analysis_done("target_vertices.yaml")
+
+            #unstable errorに対処し、target_vertices.yamlを作成する
+            while not flag:
+                with open("relative_energies.yaml") as file:
+                    relative_energies = yaml.safe_load(file)
+                    relative_energies[target_material.formula_pretty] -= 0.01
+                with open("relative_energies.yaml", 'w') as file:
+                    yaml.dump(relative_energies, file)
+                subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+                flag = check_analysis_done("target_vertices.yaml")
+
             subprocess.run(["pydefect pc"], shell=True)
             if os.path.isfile("cpd.pdf"):
                 pdf_to_png("cpd.pdf", "./")
             os.chdir("../") 
         else:
-            print("cpd calculations have not finished yet.")
+            print("cpd calculations have not finished yet. So analysis of cpd will be skipped.")
             flag = False
     else:
         print("Analysis of cpd has already finished.")
@@ -178,13 +190,13 @@ def analysis_defect(calc_info, analysis_info):
         print("Analysis of defect has already finished.")
         flag = True
     elif analysis_info["unitcell"] and not analysis_info["cpd"]:
-        print("Analysis of unitcell has not finished yet.")
+        print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
         flag = False
     elif not analysis_info["unitcell"] and analysis_info["cpd"]:
-        print("Analysis of cpd has not finished yet.")
+        print("Analysis of unitcell has not finished yet. So analysis of defect will be skipped.")
         flag = False
     elif not analysis_info["unitcell"] and not analysis_info["cpd"]:
-        print("Analysis of unitcell and cpd have not finished yet.")
+        print("Analysis of unitcell and cpd have not finished yet. So analysis of defect will be skipped.")
         flag = False
 
     return flag
@@ -210,12 +222,23 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
                 subprocess.run(["pydefect sre"], shell=True)
                 subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
                 flag = check_analysis_done("target_vertices.yaml")
+
+                #unstable errorに対処し、target_vertices.yamlを作成する
+                while not flag:
+                    with open("relative_energies.yaml") as file:
+                        relative_energies = yaml.safe_load(file)
+                        relative_energies[target_material.formula_pretty] -= 0.01
+                    with open("relative_energies.yaml", 'w') as file:
+                        yaml.dump(relative_energies, file)
+                    subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+                    flag = check_analysis_done("target_vertices.yaml")
+
                 subprocess.run(["pydefect pc"], shell=True)
                 if os.path.isfile("cpd.pdf"):
                     pdf_to_png("cpd.pdf", "./")
                 os.chdir("../../") 
             else:
-                print(f"dopant_{dopant}'s cpd calculations have not finished yet.")
+                print(f"dopant_{dopant}'s cpd calculations have not finished yet. So analysis of dopant_{dopant}'s cpd will be skipped.")
                 flag = False
         else:
             print(f"No such directory: cpd in dopant_{dopant}")
@@ -224,7 +247,7 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
         print(f"Analysis of dopant_{dopant}'s cpd has already finished.")
         flag = True
     elif not analysis_info["cpd"]:
-        print(f"Analysis of cpd has not yet finished.")
+        print(f"Analysis of cpd has not yet finished. So analysis of dopant_{dopant}'s cpd will be skipped.")
         flag = False
 
     return flag
@@ -268,22 +291,22 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
 
                 os.chdir("../../")
             else:
-                print(f"dopant_{dopant}'s defect calculations have not finished yet.")
+                print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
                 flag = False
         else:
-            print(f"No such directory: defect")
+            print(f"No such directory: dopant_{dopant}'s defect")
             flag = False
     elif analysis_info[f"{dopant}_defect"]:
         print(f"Analysis of dopant_{dopant}'s defect has already finished.")
         flag = True
     elif not analysis_info["defect"] and analysis_info[f"{dopant}_cpd"]:
-        print(f"Analysis of defect has not yet finished.")
+        print(f"Analysis of defect has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
         flag = False
     elif not analysis_info[f"{dopant}_cpd"] and analysis_info["defect"]:
-        print(f"Analysis of {dopant}_cpd has not yet finished.")
+        print(f"Analysis of {dopant}_cpd has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
         flag = False
     elif not analysis_info[f"{dopant}_cpd"] and not analysis_info["defect"]:
-        print(f"Analysis of defect and {dopant}_cpd have not yet finished.")
+        print(f"Analysis of defect and {dopant}_cpd have not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
         flag = False
 
     return flag
@@ -296,7 +319,6 @@ class AnalysisInfoMaker():
 
         #analysis_target_listを作成
         analysis_target_list = ["unitcell","cpd", "defect"]
-        print(piseset.dopants)
         if piseset.dopants is None:
             print("No dopant is considered.")
         else:
@@ -321,6 +343,7 @@ class AnalysisInfoMaker():
                 analysis_info["defect"] = analysis_defect(calc_info, analysis_info)
                 if piseset.dopants is None:
                     print("No dopant is considered.")
+                    print()
                 else:
                     for dopant in piseset.dopants:
                         analysis_info[f"{dopant}_cpd"] = analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info)

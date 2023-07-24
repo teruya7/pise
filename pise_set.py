@@ -42,6 +42,7 @@ class PiseSet():
             self.dopants = pise["dopants"]
             self.substitution_site = pise["substitution_site"]
             self.functional = pise["functional"]
+            self.path_tp_poscar = pise["path_to_poscar"]
             if self.functional == "pbesol":
                 self.unitcell = ["opt", "band", "dos", "dielectric", "band_nsc", "dielectric_rpa", "abs"]
             else:

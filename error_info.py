@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from collections import defaultdict
 from pise_set import PiseSet
 from target_info import TargetHandler
@@ -31,22 +32,22 @@ class ErrorInfoMaker():
     def __init__(self):
 
         #pise.yamlとtarget_info.jsonの読み込み
-        piseset = PiseSet()
+        self.piseset = PiseSet()
 
-        for target in piseset.target_info:
+        for target in self.piseset.target_info:
             target_material = TargetHandler(target)
-            path = target_material.make_path(piseset.functional)
+            path = target_material.make_path(self.piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
                 
                 error_info = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
 
                 #error_info.jsonの更新    
-                update_error_info("unitcell", error_info, piseset.unitcell)
+                update_error_info("unitcell", error_info, self.piseset.unitcell)
                 update_error_info("cpd", error_info)
                 update_error_info("defect", error_info)
-                if piseset.dopants is not None:
-                    for dopant in piseset.dopants:
+                if self.piseset.dopants is not None:
+                    for dopant in self.piseset.dopants:
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
                             update_error_info("cpd", error_info, dopant=dopant)
@@ -62,3 +63,19 @@ class ErrorInfoMaker():
             else:
                 print(f"No such directory: {path}")
                 print()
+    
+    def print(self):
+        for target in self.piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(self.piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+                
+                subprocess.run(["less error_info.json"], shell=True)
+
+                os.chdir("../../")
+                print()
+            else:
+                print(f"No such directory: {path}")
+                print()
+                
