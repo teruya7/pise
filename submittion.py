@@ -34,8 +34,7 @@ class JobSubmitter():
         self.piseset = PiseSet()
 
     #全てのtargetを対象にジョブを投げる
-    def submit_all(self):
-
+    def all(self):
         for target in self.piseset.target_info:
             target_material = TargetHandler(target)
             path = target_material.make_path(self.piseset.functional)
@@ -58,56 +57,60 @@ class JobSubmitter():
             else:
                 print(f"No such directory: {path}")
                 print()
-
-    #特定のtargetを対象にジョブを投げる    
-    def submit_specific(self, formula_pretty, material_id):
+   
+    #全てのtargetのunitcellを対象にジョブを投げる
+    def unitcell(self):
         for target in self.piseset.target_info:
             target_material = TargetHandler(target)
-            if target_material.material_id == material_id and target_material.formula_pretty == formula_pretty:
-                path = target_material.make_path(self.piseset.functional)
-                if os.path.isdir(path):
-                    os.chdir(path)
+            path = target_material.make_path(self.piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+                submit_jobs(self.piseset, "unitcell")
+                os.chdir("../../")
+                print()
+            else:
+                print(f"No such directory: {path}")
+                print()
 
-                    submit_jobs(self.piseset, "unitcell")
-                    submit_jobs(self.piseset, "cpd")
-                    submit_jobs(self.piseset, "defect")
-
-                    for dopant in self.piseset.dopants:
-                        if os.path.isdir(f"dopant_{dopant}"):
-                            os.chdir(f"dopant_{dopant}")
-                            submit_jobs(self.piseset, "cpd")
-                            submit_jobs(self.piseset, "defect")
-                            os.chdir("../")
-
-                    os.chdir("../../")
-                    print()
-                else:
-                    print(f"No such directory: {path}")
-                    print()
-   
     #全てのtargetのunitcell,cpd,defectを対象にジョブを投げる
-    def submit_type(self, dir_type):
+    def cpd(self):
         for target in self.piseset.target_info:
             target_material = TargetHandler(target)
             path = target_material.make_path(self.piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
 
-                if dir_type == "unitcell":
-                    submit_jobs(self.piseset, "unitcell")
-                elif dir_type == "cpd":
-                    submit_jobs(self.piseset, "cpd")
-                elif dir_type == "defect":
-                    submit_jobs(self.piseset, "defect")
+                submit_jobs(self.piseset, "cpd")
 
-                for dopant in self.piseset.dopants:
-                    if os.path.isdir(f"dopant_{dopant}"):
-                        os.chdir(f"dopant_{dopant}")
-                        if dir_type == "cpd":
+                if self.piseset.dopants is not None:
+                    for dopant in self.piseset.dopants:
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
                             submit_jobs(self.piseset, "cpd")
-                        elif dir_type == "defect":
+                            os.chdir("../")
+
+                os.chdir("../../")
+                print()
+            else:
+                print(f"No such directory: {path}")
+                print()
+
+    #全てのtargetのdefectを対象にジョブを投げる
+    def defect(self):
+        for target in self.piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(self.piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+
+                submit_jobs(self.piseset, "defect")
+
+                if self.piseset.dopants is not None:
+                    for dopant in self.piseset.dopants:
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
                             submit_jobs(self.piseset, "defect")
-                        os.chdir("../")
+                            os.chdir("../")
 
                 os.chdir("../../")
                 print()

@@ -313,10 +313,11 @@ class PreparationInfoMaker():
                 if piseset.functional == "pbesol":
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
 
-                if piseset.dopants is not None:
-                    for dopant in piseset.dopants:
-                        preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
-                        preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant)
+                if self.piseset.dopants is not None:
+                    if piseset.dopants is not None:
+                        for dopant in piseset.dopants:
+                            preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
+                            preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant)
                 
                 #preparation_info.jsonの保存
                 with open("preparation_info.json", "w") as f:
