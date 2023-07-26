@@ -1,6 +1,5 @@
 #Materials projectのAPI key
 MY_API_KEY: 0eILTXiS0OgkMkbDYBBLIBiq4PSyJ4wo
-path_to_poscar: /home/usr1/r70391a/poscar
 
 #スパコンの環境変数の設定
 limit_jobs: 128
@@ -21,7 +20,7 @@ vise_task_command_opt: vise vs -uis ENCUT 520
 vise_task_command_band: vise vs -t band -pd ../opt
 vise_task_command_band_nsc: vise vs -t band -pd ../opt -x pbe0 -uis ALGO Subrot NELM 1 HFRCUT -1 AEXX
 vise_task_command_dos: vise vs -t dos -pd ../opt -uis LVTOT True LAECHG True KPAR 1
-vise_task_command_dielectric: vise vs -t dielectric_finite_field -pd ../opt -uis IBRION 6
+vise_task_command_dielectric: vise vs -t dielectric_dfpt -pd ../opt
 vise_task_command_dielectric_rpa: vise vs -t dielectric_dfpt -pd ../opt -uis LRPA True
 vise_task_command_dielectric_hybrid: vise vs -t dielectric_finite_field -d ../opt -uis IBRION 6
 vise_task_command_abs: vise vs -t dielectric_function -pd ../opt

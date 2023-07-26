@@ -67,6 +67,7 @@ class TargetHandler():
         self.formula_pretty = target["formula_pretty"]
         self.material_id = target["material_id"]
         self.elements = target["elements"]
+        print()
         print(f"Parsing {self.formula_pretty}_{self.material_id}")
     
     def make_path(self, functional):

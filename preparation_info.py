@@ -332,4 +332,23 @@ class PreparationInfoMaker():
                 print(f"No such directory: {path}. So making {path} directory.")
                 preparation_opt(piseset, target_material.material_id, target_material.formula_pretty)
                 os.chdir("../../../../")
+
+    def false(self, target_key):
+        piseset = PiseSet()
+        for target in piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+
+                with open('preparation_info.json') as f:
+                    preparation_info = json.load(f)
+                preparation_info[target_key] = False
+                with open("preparation_info.json", "w") as f:
+                    json.dump(preparation_info, f, indent=4)
+                    
+                os.chdir("../../")
+            else:
+                print(f"No such directory: {path}. So making {path} directory.")
+
             

@@ -23,6 +23,11 @@ def submit_jobs(piseset, target_dir):
             if os.path.isfile(piseset.submission_ready):
                 subprocess.run([f"{piseset.submit_command} *.sh"], shell=True)
                 subprocess.run([f"rm {piseset.submission_ready}"], shell=True)
+            elif os.path.isfile("POSCAR-10"):
+                print("Calculations have not converged. So the job submitted again.")
+                subprocess.run(["cp POSCAR-10 POSCAR"], shell=True)
+                subprocess.run(["rm -r OUTCAR-* progress-* POSCAR-* repeat-*"], shell=True)
+                subprocess.run([f"{piseset.submit_command} *.sh"], shell=True)
             else:
                 print(f"no {piseset.submission_ready}")
             os.chdir("../")

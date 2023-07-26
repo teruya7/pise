@@ -51,21 +51,24 @@ def get_label_from_chempotdiag(path_chem_pot_diag):
 
 def pdf_to_png(pdf_file, img_path, fmt='png', dpi=200):
 
-    #pdf_file、img_pathをPathにする
-    pdf_path = Path(pdf_file)
-    image_dir = Path(img_path)
+    if os.path.isfile(pdf_file):
+        #pdf_file、img_pathをPathにする
+        pdf_path = Path(pdf_file)
+        image_dir = Path(img_path)
 
-    # PDFをImage に変換(pdf2imageの関数)
-    pages = convert_from_path(pdf_path, dpi)
+        # PDFをImage に変換(pdf2imageの関数)
+        pages = convert_from_path(pdf_path, dpi)
 
-    #名前を整える
-    for i, page in enumerate(pages):
-        file_name = "{}_{:02d}.{}".format(pdf_path.stem,i+1,fmt)
-        image_path = image_dir / file_name
-        page.save(image_path, fmt)
-        before_name = image_path
-        after_name = pdf_path.stem + "." + fmt
-        os.rename(before_name, after_name)
+        #名前を整える
+        for i, page in enumerate(pages):
+            file_name = "{}_{:02d}.{}".format(pdf_path.stem,i+1,fmt)
+            image_path = image_dir / file_name
+            page.save(image_path, fmt)
+            before_name = image_path
+            after_name = pdf_path.stem + "." + fmt
+            os.rename(before_name, after_name)
+    else:
+        print(f"No such file: {pdf_file}")
 
 def plot_pdf(file_name, vise_analysis_command):
     if not os.path.isfile(file_name):
@@ -108,8 +111,8 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
         elif not calc_info["unitcell"][band]:
             print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
             flag = False
-        elif not calc_info["unitcell"]["dos"]:
-            print("dos calculations have not finished yet. So analysis of unitcell will be skipped.")
+        elif not calc_info["unitcell"]["dielectric"]:
+            print("dielectric calculations have not finished yet. So analysis of unitcell will be skipped.")
             flag = False
         elif not calc_info["unitcell"]["abs"]:
             print("abs calculations have not finished yet. So analysis of unitcell will be skipped.")
@@ -117,7 +120,6 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
     else:
         print("Analysis of unitcell has already finished.")
         flag = True
-
     return flag
 
 def analysis_cpd(target_material, calc_info, analysis_info):
