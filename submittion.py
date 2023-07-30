@@ -50,12 +50,15 @@ class JobSubmitter():
                 submit_jobs(self.piseset, "cpd")
                 submit_jobs(self.piseset, "defect")
 
-                for dopant in self.piseset.dopants:
-                    if os.path.isdir(f"dopant_{dopant}"):
-                        os.chdir(f"dopant_{dopant}")
-                        submit_jobs(self.piseset, "cpd")
-                        submit_jobs(self.piseset, "defect")
-                        os.chdir("../")
+                if self.piseset.dopants is not None:
+                    for dopant in self.piseset.dopants:
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
+                            submit_jobs(self.piseset, "cpd")
+                            submit_jobs(self.piseset, "defect")
+                            os.chdir("../")
+                else:
+                    print("No dopants are considered.")
 
                 os.chdir("../../")
                 print()

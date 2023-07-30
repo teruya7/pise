@@ -90,7 +90,7 @@ def preparation_opt(piseset, material_id, formula_pretty):
             yaml.dump(piseset.vise_yaml, f, sort_keys=False)
 
         os.chdir("unitcell/opt")
-        if material_id is not None:
+        if material_id != "None":
             if not check_preparation_done():
                 subprocess.run([f"vise gp -m {material_id}"], shell=True)
                 prepare_job_script(piseset, "opt")
@@ -98,7 +98,7 @@ def preparation_opt(piseset, material_id, formula_pretty):
         else:
             cwd = os.getcwd()
             if not check_preparation_done():
-                shutil.copy(f"{piseset.path_to_poscar}/{formula_pretty}_POSCAR", cwd)
+                shutil.copy(f"{piseset.path_to_poscar}/{formula_pretty}_POSCAR", f"{cwd}/POSCAR")
                 prepare_job_script(piseset, "opt")
                 subprocess.run([piseset.vise_task_command_opt], shell=True)
             
@@ -126,7 +126,7 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
     return flag
 
 def preparation_band_nsc(piseset, calc_info, preparation_info):
-    if not preparation_info["band_nsc"] and calc_info["unitcell"]["band"] and calc_info["unitcell"]["dielectric_rpa"]:
+    if not preparation_info["band_nsc"] and calc_info["unitcell"]["band"] and calc_info["unitcell"]["dielectric_rpa"] and os.path.isfile("unitcell/band/WAVECAR"):
         print("Preparing band_nsc.")
         os.chdir("unitcell")
         aexx = calc_aexx("dielectric_rpa/vasprun.xml")

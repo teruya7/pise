@@ -22,7 +22,7 @@ class VisualInfoMaker():
             host_path = target_material.make_path(piseset.functional)
 
             vstx_primitivecell = '''
-            -open {local_path}/{cwd_name}/{host_path}/unitcell/opt/POSCAR
+            -open {local_path}/{cwd_name}/{host_path}/unitcell/opt/POSCAR-finish
             -export_img {local_path}/{cwd_name}/{host_path}/unitcell/opt/primitivecell.png
             -close
             '''.format(local_path = piseset.local_path, cwd_name = cwd_name, host_path = host_path)

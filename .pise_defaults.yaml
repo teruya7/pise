@@ -17,7 +17,7 @@ large_task: ["defect", "dielectric", "dielectric_rpa", "band_nsc"]
 
 #vise_task_commandの設定
 vise_task_command_opt: vise vs -uis ENCUT 520
-vise_task_command_band: vise vs -t band -pd ../opt
+vise_task_command_band: vise vs -t band -pd ../opt -uis LWAVE True
 vise_task_command_band_nsc: vise vs -t band -pd ../opt -x pbe0 -uis ALGO Subrot NELM 1 HFRCUT -1 AEXX
 vise_task_command_dos: vise vs -t dos -pd ../opt -uis LVTOT True LAECHG True KPAR 1
 vise_task_command_dielectric: vise vs -t dielectric_dfpt -pd ../opt

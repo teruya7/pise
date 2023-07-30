@@ -5,6 +5,7 @@ from collections import defaultdict
 from pise_set import PiseSet
 from target_info import TargetHandler
 from calc_info import make_dir_list, check_calc_done
+import glob
 
 def print_error_path(target_dir, error_info, cwd, dopant=None):
     if dopant is None:

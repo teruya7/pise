@@ -6,7 +6,7 @@ from analysis_info import AnalysisInfoMaker
 from submittion import JobSubmitter
 from visual_info import VisualInfoMaker
 from summary_info import SummuryInfoMaker
-from markdown import MarkdownMaker
+from markdown_info import MarkdownInfoMaker
 from error_info import ErrorInfoMaker
 
 Fire({
@@ -18,5 +18,5 @@ Fire({
     "vi": VisualInfoMaker,
     "si": SummuryInfoMaker,
     "submit": JobSubmitter,
-    "md": MarkdownMaker
+    "mi": MarkdownInfoMaker
     })

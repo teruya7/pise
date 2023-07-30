@@ -86,6 +86,7 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
             band = "band" 
         #unitcellの計算が完了しているか確認
         if calc_info["unitcell"][band] and calc_info["unitcell"]["dielectric"] and calc_info["unitcell"]["abs"]:
+            print("Analyzing unitcell.")
             os.chdir("unitcell") 
             subprocess.run([f"pydefect_vasp u -vb {band}/vasprun.xml -ob {band}/OUTCAR-finish -odc dielectric/OUTCAR-finish -odi dielectric/OUTCAR-finish"], shell=True)
             flag = check_analysis_done("unitcell.yaml")
@@ -127,19 +128,27 @@ def analysis_cpd(target_material, calc_info, analysis_info):
     if not analysis_info["cpd"]:
         #cpdの計算が完了しているか確認
         if check_calc_alldone(calc_info["cpd"].values()):
+            print("Analyzing cpd.")
             os.chdir("cpd") 
             if not os.path.isdir("host"):
                 subprocess.run(["ln -s ../unitcell/opt host"], shell=True)
-            subprocess.run(["pydefect_vasp mce -d */"], shell=True)
-            subprocess.run(["pydefect sre"], shell=True)
-            subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+            if not os.path.isfile("composition_energies.yaml"):
+                subprocess.run(["pydefect_vasp mce -d */"], shell=True)
+            if not os.path.isfile("relative_energies.yaml"):
+                subprocess.run(["pydefect sre"], shell=True)
+            if not os.path.isfile("target_vertices.yaml"):
+                subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
             flag = check_analysis_done("target_vertices.yaml")
 
             #unstable errorに対処し、target_vertices.yamlを作成する
             while not flag:
                 with open("relative_energies.yaml") as file:
                     relative_energies = yaml.safe_load(file)
-                    relative_energies[target_material.formula_pretty] -= 0.01
+                    try:
+                        relative_energies[target_material.formula_pretty] -= 0.01
+                    except KeyError:
+                        print(f"Target {target_material.formula_pretty} is not in relative energy compounds, so stop here.")
+                        break
                 with open("relative_energies.yaml", 'w') as file:
                     yaml.dump(relative_energies, file)
                 subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
@@ -163,6 +172,7 @@ def analysis_defect(calc_info, analysis_info):
     if not analysis_info["defect"] and analysis_info["unitcell"] and analysis_info["cpd"]:
         #defectの計算が完了しているか確認
         if check_calc_alldone(calc_info["defect"].values()):
+            print("Analyzing defect.")
             os.chdir("defect") 
             subprocess.run(["pydefect_vasp cr -d *_*/ perfect"], shell=True)
             subprocess.run(["pydefect efnv -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml"], shell=True)
@@ -210,6 +220,7 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
         if os.path.isdir(f"dopant_{dopant}/cpd"):
             #dopantのcpdの計算が完了しているか確認
             if check_calc_alldone(calc_info[f"dopant_{dopant}"]["cpd"].values()):
+                print(f"Analyzing dopant_{dopant}'s cpd.")
                 os.chdir(f"dopant_{dopant}/cpd")
                 #host情報をシンボリックリンクで持ってくる 
                 if not os.path.isdir("host"):
@@ -220,22 +231,29 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
                     if not os.path.isdir(cpd_dir_name):
                         subprocess.run([f"ln -s ../../cpd/{cpd_dir_name} ./"], shell=True)
                 
-                subprocess.run(["pydefect_vasp mce -d */"], shell=True)
-                subprocess.run(["pydefect sre"], shell=True)
-                subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+                if not os.path.isfile("composition_energies.yaml"):
+                    subprocess.run(["pydefect_vasp mce -d */"], shell=True)
+                if not os.path.isfile("relative_energies.yaml"):
+                    subprocess.run(["pydefect sre"], shell=True)
+                if not os.path.isfile("target_vertices.yaml"):
+                    subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
                 flag = check_analysis_done("target_vertices.yaml")
 
                 #unstable errorに対処し、target_vertices.yamlを作成する
                 while not flag:
                     with open("relative_energies.yaml") as file:
                         relative_energies = yaml.safe_load(file)
-                        relative_energies[target_material.formula_pretty] -= 0.01
+                        try:
+                            relative_energies[target_material.formula_pretty] -= 0.01
+                        except KeyError:
+                            print(f"Target {target_material.formula_pretty} is not in relative energy compounds, so stop here.")
+                            break
                     with open("relative_energies.yaml", 'w') as file:
                         yaml.dump(relative_energies, file)
                     subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
                     flag = check_analysis_done("target_vertices.yaml")
-
-                subprocess.run(["pydefect pc"], shell=True)
+                if os.path.isfile("chem_pot_diag.json"):
+                    subprocess.run(["pydefect pc"], shell=True)
                 if os.path.isfile("cpd.pdf"):
                     pdf_to_png("cpd.pdf", "./")
                 os.chdir("../../") 
@@ -261,6 +279,7 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
         if os.path.isdir(f"dopant_{dopant}/defect"):
             #dopantのdefectの計算が完了しているか確認
             if check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
+                print(f"Analyzing dopant_{dopant}'s defect.")
                 os.chdir(f"dopant_{dopant}/defect") 
                 if not os.path.isdir("perfect"):
                         subprocess.run([f"ln -s ../../defect/perfect ./"], shell=True)
@@ -357,6 +376,40 @@ class AnalysisInfoMaker():
                 os.chdir("../../")
             else:
                 print(f"No such directory: {path}")
+    
+    def print(self):
+        piseset = PiseSet()
+        for target in piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+                
+                subprocess.run(["less analysis_info.json"], shell=True)
+
+                os.chdir("../../")
+                print()
+            else:
+                print(f"No such directory: {path}")
+                print()
+
+    def false(self, target_key):
+        piseset = PiseSet()
+        for target in piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+
+                with open('analysis_info.json') as f:
+                    analysis_info = json.load(f)
+                analysis_info[target_key] = False
+                with open("analysis_info.json", "w") as f:
+                    json.dump(analysis_info, f, indent=4)
+                    
+                os.chdir("../../")
+            else:
+                print(f"No such directory: {path}. So making {path} directory.")
 
 if __name__ == '__main__':
     print()
