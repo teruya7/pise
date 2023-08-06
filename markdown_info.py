@@ -133,6 +133,7 @@ class MarkdownInfoMaker():
                         for label in summary_info["labels"]:
                             f.write(f"## {label}\n")
                             f.write(f"![Alt text](defect/energy_{label}.png)\n")
+                            f.write(f"![Alt text](defect/energy_{label}_default.png)\n")
                         if piseset.dopants is not None:
                             for dopant in piseset.dopants:
                                 f.write(f"# {dopant}\n")

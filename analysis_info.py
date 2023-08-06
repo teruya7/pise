@@ -190,6 +190,9 @@ def analysis_defect(calc_info, analysis_info):
             labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
             for label in labels:
                 subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
+                subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
+                pdf_to_png(f"energy_{label}_default.pdf", "./")
+                subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
                 pdf_to_png(f"energy_{label}.pdf", "./")
             flag = check_analysis_done("energy_A.pdf")
 
@@ -307,6 +310,97 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
                 labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
                 for label in labels:
                     subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
+                    subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
+                    pdf_to_png(f"energy_{label}_default.pdf", "./")
+                    subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
+                    pdf_to_png(f"energy_{label}.pdf", "./")
+                flag = check_analysis_done("energy_A.pdf")
+
+                os.chdir("../../")
+            else:
+                print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
+                flag = False
+        else:
+            print(f"No such directory: dopant_{dopant}'s defect")
+            flag = False
+    elif analysis_info[f"{dopant}_defect"]:
+        print(f"Analysis of dopant_{dopant}'s defect has already finished.")
+        flag = True
+    elif not analysis_info["defect"] and analysis_info[f"{dopant}_cpd"]:
+        print(f"Analysis of defect has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        flag = False
+    elif not analysis_info[f"{dopant}_cpd"] and analysis_info["defect"]:
+        print(f"Analysis of {dopant}_cpd has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        flag = False
+    elif not analysis_info[f"{dopant}_cpd"] and not analysis_info["defect"]:
+        print(f"Analysis of defect and {dopant}_cpd have not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        flag = False
+
+    return flag
+
+#欠陥形成エネルギー図の作成のみを行う
+def analysis_defect_plot(calc_info, analysis_info):
+    #defectが解析済みかどうかと解析可能な状況なのか確認
+    if not analysis_info["defect"] and analysis_info["unitcell"] and analysis_info["cpd"]:
+        #defectの計算が完了しているか確認
+        if check_calc_alldone(calc_info["defect"].values()):
+            print("Analyzing defect.")
+            os.chdir("defect") 
+
+            subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
+            subprocess.run(["pydefect des -d *_*/ -u ../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
+            subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
+            
+            labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
+            for label in labels:
+                subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
+                subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
+                pdf_to_png(f"energy_{label}_default.pdf", "./")
+                subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
+                pdf_to_png(f"energy_{label}.pdf", "./")
+            flag = check_analysis_done("energy_A.pdf")
+
+            os.chdir("../") 
+        else:
+            print("defect calculations have not finished yet.")
+            flag = False
+
+    elif analysis_info["defect"]:
+        print("Analysis of defect has already finished.")
+        flag = True
+    elif analysis_info["unitcell"] and not analysis_info["cpd"]:
+        print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
+        flag = False
+    elif not analysis_info["unitcell"] and analysis_info["cpd"]:
+        print("Analysis of unitcell has not finished yet. So analysis of defect will be skipped.")
+        flag = False
+    elif not analysis_info["unitcell"] and not analysis_info["cpd"]:
+        print("Analysis of unitcell and cpd have not finished yet. So analysis of defect will be skipped.")
+        flag = False
+
+    return flag
+
+def analysis_dopant_defect_plot(dopant, calc_info, analysis_info):
+    #dopantのdefectが解析済みかどうか確認
+    if not analysis_info[f"{dopant}_defect"] and analysis_info["defect"] and analysis_info[f"{dopant}_cpd"]:
+        #dopnatのdefectフォルダがあるか確認
+        if os.path.isdir(f"dopant_{dopant}/defect"):
+            #dopantのdefectの計算が完了しているか確認
+            if check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
+                print(f"Analyzing dopant_{dopant}'s defect.")
+                os.chdir(f"dopant_{dopant}/defect") 
+
+                subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
+                subprocess.run(["pydefect des -d *_*/ -u ../../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
+                subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
+                    
+                #化学ポテンシャルの極限の条件のラベルを取得
+                labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
+                for label in labels:
+                    subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
+                    subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
+                    pdf_to_png(f"energy_{label}_default.pdf", "./")
+                    subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
                     pdf_to_png(f"energy_{label}.pdf", "./")
                 flag = check_analysis_done("energy_A.pdf")
 
@@ -334,39 +428,41 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
 
 class AnalysisInfoMaker():
     def __init__(self):
-        piseset = PiseSet()
+        self.piseset = PiseSet()
         #calc_info.jsonの更新
         CalcInfoMaker()
 
         #analysis_target_listを作成
         analysis_target_list = ["unitcell","cpd", "defect"]
-        if piseset.dopants is None:
+        if self.piseset.dopants is None:
             print("No dopant is considered.")
         else:
-            for dopant in piseset.dopants:
+            for dopant in self.piseset.dopants:
                 analysis_target_list.append(f"{dopant}_cpd")
                 analysis_target_list.append(f"{dopant}_defect")
+        self.analysis_target_list = analysis_target_list
 
-        for target in piseset.target_info:
+    def analysis(self):
+        for target in self.piseset.target_info:
             target_material = TargetHandler(target)
-            path = target_material.make_path(piseset.functional)
+            path = target_material.make_path(self.piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
 
                 #analysis_info.jsonとcalc_info.jsonの読み込み
-                analysis_info = initialize_analysis_info(analysis_target_list)
+                analysis_info = initialize_analysis_info(self.analysis_target_list)
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
 
                 #解析を実行
-                analysis_info["unitcell"] = analysis_unitcell(piseset, calc_info, analysis_info)
+                analysis_info["unitcell"] = analysis_unitcell(self.piseset, calc_info, analysis_info)
                 analysis_info["cpd"] = analysis_cpd(target_material, calc_info, analysis_info)
                 analysis_info["defect"] = analysis_defect(calc_info, analysis_info)
-                if piseset.dopants is None:
+                if self.piseset.dopants is None:
                     print("No dopant is considered.")
                     print()
                 else:
-                    for dopant in piseset.dopants:
+                    for dopant in self.piseset.dopants:
                         analysis_info[f"{dopant}_cpd"] = analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info)
                         analysis_info[f"{dopant}_defect"] = analysis_dopant_defect(dopant, calc_info, analysis_info)
                     
@@ -378,10 +474,9 @@ class AnalysisInfoMaker():
                 print(f"No such directory: {path}")
     
     def print(self):
-        piseset = PiseSet()
-        for target in piseset.target_info:
+        for target in self.piseset.target_info:
             target_material = TargetHandler(target)
-            path = target_material.make_path(piseset.functional)
+            path = target_material.make_path(self.piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
                 
@@ -392,12 +487,11 @@ class AnalysisInfoMaker():
             else:
                 print(f"No such directory: {path}")
                 print()
-
+    #target_key={unitcell,cpd,defect}で指定したanalysis_info.jsonのkeyのvalueをfalseにする。
     def false(self, target_key):
-        piseset = PiseSet()
-        for target in piseset.target_info:
+        for target in self.piseset.target_info:
             target_material = TargetHandler(target)
-            path = target_material.make_path(piseset.functional)
+            path = target_material.make_path(self.piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
 
@@ -410,6 +504,34 @@ class AnalysisInfoMaker():
                 os.chdir("../../")
             else:
                 print(f"No such directory: {path}. So making {path} directory.")
+
+    def plot(self):
+        for target in self.piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(self.piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+
+                #analysis_info.jsonとcalc_info.jsonの読み込み
+                analysis_info = initialize_analysis_info(self.analysis_target_list)
+                with open('calc_info.json') as f:
+                    calc_info = json.load(f)
+
+                #解析を実行
+                analysis_info["defect"] = analysis_defect_plot(calc_info, analysis_info)
+                if self.piseset.dopants is None:
+                    print("No dopant is considered.")
+                    print()
+                else:
+                    for dopant in self.piseset.dopants:
+                        analysis_info[f"{dopant}_defect"] = analysis_dopant_defect_plot(dopant, calc_info, analysis_info)
+                    
+                with open("analysis_info.json", "w") as f:
+                    json.dump(analysis_info, f, indent=4)
+
+                os.chdir("../../")
+            else:
+                print(f"No such directory: {path}")
 
 if __name__ == '__main__':
     print()
