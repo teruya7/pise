@@ -12,9 +12,12 @@ def print_error_path(target_dir, error_info, cwd, dopant=None):
             for dir_name in error_info[target_dir]:
                 print(f"{cwd}/{target_dir}/{dir_name}")
     else:
-        if target_dir in error_info[f"dopant_{dopant}"]:
-            for dir_name in error_info[f"dopant_{dopant}"][target_dir]:
-                print(f"{cwd}/dopant_{dopant}/{target_dir}/{dir_name}")
+        try:
+            if target_dir in error_info[f"dopant_{dopant}"]:
+                for dir_name in error_info[f"dopant_{dopant}"][target_dir]:
+                    print(f"{cwd}/dopant_{dopant}/{target_dir}/{dir_name}")
+        except KeyError:
+            print()
 
 #target_dirのsub_dirの計算が終わったかの情報をerror_infoに記録
 def update_error_info(target_dir, error_info, unitcell_list=None, dopant=None):

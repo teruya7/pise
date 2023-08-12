@@ -197,18 +197,24 @@ def preparation_defect(piseset, calc_info, preparation_info):
         os.makedirs("defect", exist_ok=True)
         os.chdir("defect")
         subprocess.run(["pydefect s -p ../unitcell/dos/POSCAR-finish --max_atoms 150"], shell=True)
-        subprocess.run(["pydefect_vasp le -v ../unitcell/dos/repeat-*/AECCAR{0,2} -i all_electron_charge"], shell=True)
-        subprocess.run(["pydefect_util ai --local_extrema volumetric_data_local_extrema.json -i 1 2"], shell=True)
-        subprocess.run(["pydefect ds"], shell=True)
-        subprocess.run(["pydefect_vasp de"], shell=True)
+        if os.path.isfile("supercell_info.json"):
+            subprocess.run(["pydefect_vasp le -v ../unitcell/dos/repeat-*/AECCAR{0,2} -i all_electron_charge"], shell=True)
+            subprocess.run(["pydefect_util ai --local_extrema volumetric_data_local_extrema.json -i 1 2"], shell=True)
+            subprocess.run(["pydefect ds"], shell=True)
+            subprocess.run(["pydefect_vasp de"], shell=True)
+            
+            #計算インプットの作成
+            defect_dir_list = make_dir_list()
+            for target_dir in defect_dir_list:
+                prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
+            
+            os.chdir("../")
+            flag = True
+        else:
+            print("No such file: supercell_info.json")
+            flag = False
 
-        #計算インプットの作成
-        defect_dir_list = make_dir_list()
-        for target_dir in defect_dir_list:
-            prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
         
-        os.chdir("../")
-        flag = True
 
     elif not calc_info["unitcell"]["dos"]:
         print("dos calculations have not finished yet. So preparing defect will be skipped.")
