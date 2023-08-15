@@ -91,6 +91,9 @@ class CalcInfoMaker():
                             update_calc_info("defect", calc_info, dopant=dopant)
                             os.chdir("../")
 
+                if os.path.isfile("pise_selftrap.yaml"):
+                    update_calc_info("selftrap", calc_info)
+
                 #calc_info.jsonの保存
                 with open("calc_info.json", "w") as f:
                     json.dump(calc_info, f, indent=4)

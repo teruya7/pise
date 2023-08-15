@@ -286,6 +286,44 @@ def preparation_dopant_defect(piseset, preparation_info, dopant):
         flag = True
     return flag
 
+def preparation_selftrap(piseset, preparation_info):
+    if preparation_info["defect"]:
+        #preparetion_infoにkeyを追加
+        preparation_info.setdefault("selftrap",False)
+        if not preparation_info["selftrap"]:
+            print("Preparing selftrap.")
+
+            with open("pise_selftrap.yaml") as f:
+                pise_selftrap = yaml.safe_load(f)
+                target = pise_selftrap["target"]
+                charge = pise_selftrap["charge"]
+
+            os.makedirs("selftrap", exist_ok=True)
+            os.chdir("selftrap")
+            subprocess.run(["cp ../defect/supercell_info.json ./"], shell=True)
+            
+            with open("defect_in.yaml", mode='w') as f:
+                f.write(f"{target}_{target}1: {charge}\n")
+
+            subprocess.run(["pydefect_vasp de"], shell=True)
+            subprocess.run(["rm -r perfect"], shell=True)
+                
+            #計算インプットの作成
+            defect_dir_list = make_dir_list()
+            for target_dir in defect_dir_list:
+                prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
+            os.chdir("../")
+            flag = True
+        else:
+            print(f"Preparation of selftrap has already finished.")
+            flag = True
+
+    elif preparation_info["defect"]:
+        print("Preparation of defect has not finished yet.")
+        flag = False
+    return flag
+
+
 class PreparationInfoMaker():
     def __init__(self):
         #pise.yamlとtarget_info.jsonの読み込み
@@ -329,6 +367,9 @@ class PreparationInfoMaker():
                             preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
                             preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant)
                 
+                if os.path.isfile("pise_selftrap.yaml"):
+                    preparation_info["selftrap"] = preparation_selftrap(piseset, preparation_info)
+
                 #preparation_info.jsonの保存
                 with open("preparation_info.json", "w") as f:
                     json.dump(preparation_info, f, indent=4)

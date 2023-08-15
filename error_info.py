@@ -67,6 +67,9 @@ class ErrorInfoMaker():
                             update_error_info("defect", error_info, dopant=dopant)
                             os.chdir("../")
 
+                if os.path.isfile("pise_selftrap.yaml"):
+                    update_error_info("selftrap", error_info)
+
                 #error_info.jsonの保存
                 with open("error_info.json", "w") as f:
                     json.dump(error_info, f, indent=4)
@@ -111,6 +114,8 @@ class ErrorInfoMaker():
                     for dopant in self.piseset.dopants:
                         print_error_path("cpd", error_info, cwd, dopant)
                         print_error_path("cpd", error_info, cwd, dopant)
+                if os.path.isfile("pise_selftrap.yaml"):
+                    print_error_path("selftrap", error_info, cwd)
 
                 os.chdir("../../")
                 print()
