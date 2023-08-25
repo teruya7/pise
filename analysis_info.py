@@ -141,6 +141,24 @@ def plot_pdf(file_name, vise_analysis_command):
     else:
         print(f"{file_name} has already existed.")
 
+def change_name_png(former_name, later_name):
+    subprocess.run([f"mv {former_name} {later_name}"], shell=True)
+    pdf_to_png(later_name, "./")
+
+def plot_energy_diagram(labels):
+    for label in labels:
+        subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
+        change_name_png(f"energy_{label}.pdf", f"energy_{label}_default.pdf")
+        
+        subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
+        change_name_png(f"energy_{label}.pdf", f"energy_{label}_-5_5.pdf")
+
+        subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
+        change_name_png(f"energy_{label}.pdf", f"energy_{label}_default_shallow.pdf")
+
+        subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
+        change_name_png(f"energy_{label}.pdf", f"energy_{label}_-5_5_shallow.pdf")
+
 def analysis_unitcell(piseset, calc_info, analysis_info):
     #unitcellが解析済みかどうか確認
     if not analysis_info["unitcell"]:     
@@ -253,12 +271,7 @@ def analysis_defect(calc_info, analysis_info):
             subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
 
             labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-            for label in labels:
-                subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
-                subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
-                pdf_to_png(f"energy_{label}_default.pdf", "./")
-                subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
-                pdf_to_png(f"energy_{label}.pdf", "./")
+            plot_energy_diagram(labels)
             flag = check_analysis_done("energy_A.pdf")
 
             os.chdir("../") 
@@ -380,12 +393,8 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
                     
                 #化学ポテンシャルの極限の条件のラベルを取得
                 labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-                for label in labels:
-                    subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
-                    subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
-                    pdf_to_png(f"energy_{label}_default.pdf", "./")
-                    subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
-                    pdf_to_png(f"energy_{label}.pdf", "./")
+                plot_energy_diagram(labels)
+
                 flag = check_analysis_done("energy_A.pdf")
 
                 os.chdir("../../")
@@ -424,12 +433,7 @@ def analysis_defect_plot(calc_info, analysis_info):
             subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
             
             labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-            for label in labels:
-                subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
-                subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
-                pdf_to_png(f"energy_{label}_default.pdf", "./")
-                subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
-                pdf_to_png(f"energy_{label}.pdf", "./")
+            plot_energy_diagram(labels)
             flag = check_analysis_done("energy_A.pdf")
 
             os.chdir("../") 
@@ -468,12 +472,7 @@ def analysis_dopant_defect_plot(dopant, calc_info, analysis_info):
                     
                 #化学ポテンシャルの極限の条件のラベルを取得
                 labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-                for label in labels:
-                    subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
-                    subprocess.run([f"mv energy_{label}.pdf energy_{label}_default.pdf"], shell=True)
-                    pdf_to_png(f"energy_{label}_default.pdf", "./")
-                    subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
-                    pdf_to_png(f"energy_{label}.pdf", "./")
+                plot_energy_diagram(labels)
                 flag = check_analysis_done("energy_A.pdf")
 
                 os.chdir("../../")
@@ -545,20 +544,6 @@ class AnalysisInfoMaker():
             else:
                 print(f"No such directory: {path}")
     
-    def print(self):
-        for target in self.piseset.target_info:
-            target_material = TargetHandler(target)
-            path = target_material.make_path(self.piseset.functional)
-            if os.path.isdir(path):
-                os.chdir(path)
-                
-                subprocess.run(["less analysis_info.json"], shell=True)
-
-                os.chdir("../../")
-                print()
-            else:
-                print(f"No such directory: {path}")
-                print()
     #target_key={unitcell,cpd,defect}で指定したanalysis_info.jsonのkeyのvalueをfalseにする。
     def false(self, target_key):
         for target in self.piseset.target_info:

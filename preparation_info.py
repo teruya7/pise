@@ -109,6 +109,12 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
         #汎関数によって処理を分ける
         prepare_input_files(piseset, "band", piseset.vise_task_command_band, "band")
         prepare_input_files(piseset, "dos", piseset.vise_task_command_dos, "dos")
+
+        #格子間Hの配置の候補を考えるために精度の高い計算でCHGCAR, LOCPOT, ELFCARの出力する
+        if piseset.dopants is not None:
+            if "H" in piseset.dopants:
+                prepare_input_files(piseset, "dos_accurate", piseset.vise_task_command_dos_accurate, "dos")
+
         prepare_input_files(piseset, "abs", piseset.vise_task_command_abs, "abs")
         if piseset.functional == "pbesol": 
             prepare_input_files(piseset, "dielectric", piseset.vise_task_command_dielectric, "dielectric")
@@ -341,6 +347,8 @@ class PreparationInfoMaker():
             for dopant in piseset.dopants:
                 preparation_target_list.append(f"{dopant}_cpd")
                 preparation_target_list.append(f"{dopant}_defect")
+                if dopant == "H":
+                    preparation_target_list.append("dos_accurate")
 
         for target in piseset.target_info:
             target_material = TargetHandler(target)

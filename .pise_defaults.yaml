@@ -7,6 +7,7 @@ num_jobs_command: pjstat |awk '{print $10}'| awk 'NR==3'
 submit_command: pjsub
 submission_ready: ready_for_submission.txt
 job_script_path: /home/usr1/r70391a/scripts
+interstitial_explorer_path: null
 
 #job_scriptの設定
 job_script_small: run6.4.1_1.sh
@@ -20,6 +21,7 @@ vise_task_command_opt: vise vs -uis ENCUT 520
 vise_task_command_band: vise vs -t band -pd ../opt -uis LWAVE True
 vise_task_command_band_nsc: vise vs -t band -pd ../opt -x pbe0 -uis ALGO Subrot NELM 1 HFRCUT -1 AEXX
 vise_task_command_dos: vise vs -t dos -pd ../opt -uis LVTOT True LAECHG True KPAR 1
+vise_task_command_dos_accurate: vise vs -t dos -d ../opt -uis PREC Accurate EDIFF 1e-08 NELM 300 LCHARG True LELF True LVHAR True KPAR 1
 vise_task_command_dielectric: vise vs -t dielectric_dfpt -pd ../opt
 vise_task_command_dielectric_rpa: vise vs -t dielectric_dfpt -pd ../opt -uis LRPA True
 vise_task_command_dielectric_hybrid: vise vs -t dielectric_finite_field -d ../opt -uis IBRION 6

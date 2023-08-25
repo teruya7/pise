@@ -48,7 +48,7 @@ def make_base_markdown(piseset, summary_info):
 |  concentrations |  {concentrations}  |
 |  temperature |  {temperature}  |
 |  p_x |  {p_x}  |
-|  p_x |  {p_y}  |
+|  p_y |  {p_y}  |
 |  p_z |  {p_z}  |
 |  n_x |  {n_x}  |
 |  n_y |  {n_y}  |
@@ -132,8 +132,10 @@ class MarkdownInfoMaker():
                         f.write(f"{summary}\n")
                         for label in summary_info["labels"]:
                             f.write(f"## {label}\n")
-                            f.write(f"![Alt text](defect/energy_{label}.png)\n")
+                            f.write(f"![Alt text](defect/energy_{label}_-5_5.png)\n")
                             f.write(f"![Alt text](defect/energy_{label}_default.png)\n")
+                            f.write(f"![Alt text](defect/energy_{label}_-5_5_shallow.png)\n")
+                            f.write(f"![Alt text](defect/energy_{label}_default_shallow.png)\n")
                         if piseset.dopants is not None:
                             for dopant in piseset.dopants:
                                 f.write(f"# {dopant}\n")
@@ -142,8 +144,14 @@ class MarkdownInfoMaker():
                                 f.write("# defect formation energy\n")
                                 for label in summary_info[dopant]["labels"]:
                                     f.write(f"## {label}\n")
-                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}.png)\n")
+                                    f.write(f"### energy_{label}_-5_5\n")
+                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_-5_5.png)\n")
+                                    f.write(f"### energy_{label}_default\n")
                                     f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_default.png)\n")
+                                    f.write(f"### energy_{label}_-5_5_shallow\n")
+                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_-5_5_shallow.png)\n")
+                                    f.write(f"### energy_{label}_default_shallow\n")
+                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_default_shallow.png)\n")
                     markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = True
                 else:
                     print("No such file: summary_info.json")
