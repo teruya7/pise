@@ -4,9 +4,9 @@ MY_API_KEY: null
 #スパコンの環境変数の設定
 limit_jobs: 1800
 num_jobs_command: null
-submit_command: sbatch
+submit_command: null
 submission_ready: ready_for_submission.txt
-job_script_path: /LARGE0/gr10261/nagafuji/scripts
+job_script_path: null
 interstitial_explorer_path: null
 
 #job_scriptの設定
@@ -37,4 +37,4 @@ vise_analysis_command_unitcell_nsc:  pydefect_vasp u -vb band_nsc/vasprun.xml -o
 vise_analysis_command_unitcell_hybrid:  pydefect_vasp u -vb band/vasprun.xml -ob band/OUTCAR-finish -odc dielectric/OUTCAR -odi dielectric/OUTCAR
 
 #マウントした時のlocalのパス
-local_path: /Users/teruyanagafuji/mnt/ito
+local_path: null
