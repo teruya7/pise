@@ -1,12 +1,12 @@
 #Materials projectのAPI key
-MY_API_KEY: 0eILTXiS0OgkMkbDYBBLIBiq4PSyJ4wo
+MY_API_KEY: null
 
 #スパコンの環境変数の設定
-limit_jobs: 128
-num_jobs_command: pjstat |awk '{print $10}'| awk 'NR==3'
-submit_command: pjsub
+limit_jobs: 1800
+num_jobs_command: null
+submit_command: sbatch
 submission_ready: ready_for_submission.txt
-job_script_path: /home/usr1/r70391a/scripts
+job_script_path: /LARGE0/gr10261/nagafuji/scripts
 interstitial_explorer_path: null
 
 #job_scriptの設定
