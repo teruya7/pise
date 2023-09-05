@@ -33,6 +33,14 @@ class PiseSet():
             self.vise_task_command_abs = pise_defaults["vise_task_command_abs"]
             self.vise_task_command_defect = pise_defaults["vise_task_command_defect"]
 
+            #vise_analysis_command
+            self.vise_analysis_command_plot_band = pise_defaults["vise_analysis_command_plot_band"]
+            self.vise_analysis_command_plot_dos = pise_defaults["vise_analysis_command_plot_dos"]
+            self.vise_analysis_command_effective_mass = pise_defaults["vise_analysis_command_effective_mass"]
+            self.vise_analysis_command_plot_abs = pise_defaults["vise_analysis_command_plot_abs"]
+            self.vise_analysis_command_unitcell_nsc = pise_defaults["vise_analysis_command_unitcell_nsc"]
+            self.vise_analysis_command_unitcell_hybrid = pise_defaults["vise_analysis_command_unitcell_hybrid"]
+
             self.local_path = pise_defaults["local_path"]
 
             
