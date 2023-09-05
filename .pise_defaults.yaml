@@ -28,5 +28,13 @@ vise_task_command_dielectric_hybrid: vise vs -t dielectric_finite_field -d ../op
 vise_task_command_abs: vise vs -t dielectric_function -pd ../opt
 vise_task_command_defect: vise vs -t defect -uis SYMPREC 1e-4 --options only_even_num_kpts True
 
+#vise_analysis_command
+vise_analysis_command_plot_band: vise pb
+vise_analysis_command_plot_dos: vise pd
+vise_analysis_command_effective_mass: vise em -t 300 -c 16
+vise_analysis_command_plot_abs: vise pdf -ckk
+vise_analysis_command_unitcell_nsc:  pydefect_vasp u -vb band_nsc/vasprun.xml -ob band_nsc/OUTCAR-finish -odc dielectric/OUTCAR-finish -odi dielectric/OUTCAR-finish
+vise_analysis_command_unitcell_hybrid:  pydefect_vasp u -vb band/vasprun.xml -ob band/OUTCAR-finish -odc dielectric/OUTCAR -odi dielectric/OUTCAR
+
 #マウントした時のlocalのパス
 local_path: /Users/teruyanagafuji/mnt/ito

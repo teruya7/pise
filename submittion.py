@@ -1,8 +1,8 @@
 import os
 import subprocess
-from calc_info import make_dir_list
+from calculation import make_dir_list
 from pise_set import PiseSet
-from target_info import TargetHandler
+from target import TargetHandler
 
 def submit_jobs(piseset, target_dir):
     if os.path.isdir(target_dir):
@@ -39,7 +39,7 @@ def submit_jobs(piseset, target_dir):
             os.chdir("../")
         os.chdir("../")
     
-class JobSubmitter():
+class Submittion():
     def __init__(self):
         #pise.yamlとtarget_info.jsonの読み込み
         self.piseset = PiseSet()

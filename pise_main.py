@@ -1,22 +1,20 @@
 from fire import Fire
-from calc_info import CalcInfoMaker
-from target_info import TargetInfoMaker
-from preparation_info import PreparationInfoMaker
-from analysis_info import AnalysisInfoMaker
-from submittion import JobSubmitter
-from visual_info import VisualInfoMaker
-from summary_info import SummuryInfoMaker
-from markdown_info import MarkdownInfoMaker
-from error_info import ErrorInfoMaker
+from target import Target
+from preparation import Preparation
+from analysis import Analysis
+from submittion import Submittion
+from visualization import Visualization
+from summary import Summury
+from markdown import Markdown
+from error import Error
 
 Fire({
-    "ti": TargetInfoMaker, 
-    "ci": CalcInfoMaker, 
-    "pi": PreparationInfoMaker,
-    "ei": ErrorInfoMaker,
-    "ai": AnalysisInfoMaker, 
-    "vi": VisualInfoMaker,
-    "si": SummuryInfoMaker,
-    "submit": JobSubmitter,
-    "mi": MarkdownInfoMaker
+    "tar": Target, 
+    "pre": Preparation,
+    "er": Error,
+    "ana": Analysis, 
+    "vis": Visualization,
+    "sum": Summury,
+    "submit": Submittion,
+    "md": Markdown
     })
