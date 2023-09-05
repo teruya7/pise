@@ -13,6 +13,26 @@ from pymatgen.core.periodic_table import Element
 import string
 import itertools
 
+#unstable_errorに対処し、target_vertices.yamlを作成する
+def avoid_unstable_error(flag, target_material, dopant=None):
+    while not flag:
+        with open("relative_energies.yaml") as file:
+            relative_energies = yaml.safe_load(file)
+            try:
+                relative_energies[target_material.formula_pretty] -= 0.01
+            except KeyError:
+                print(f"Target {target_material.formula_pretty} is not in relative energy compounds, so stop here.")
+                break
+        with open("relative_energies.yaml", 'w') as file:
+            yaml.dump(relative_energies, file)
+
+        if dopant is not None:
+            pydefect_cv_dopant(target_material, dopant)
+        else:
+            subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+
+        flag = check_analysis_done("target_vertices.yaml")
+
 def pydefect_cv_dopant(target_material, dopant):
     elements = target_material.elements
     if len(elements) == 2:
@@ -153,347 +173,347 @@ def plot_energy_diagram(labels):
         subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
         change_name_png(f"energy_{label}.pdf", f"energy_{label}_-5_5.pdf")
 
-        subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
-        change_name_png(f"energy_{label}.pdf", f"energy_{label}_default_shallow.pdf")
-
-        subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
-        change_name_png(f"energy_{label}.pdf", f"energy_{label}_-5_5_shallow.pdf")
-
 def analysis_unitcell(piseset, calc_info, analysis_info):
     #unitcellが解析済みかどうか確認
-    if not analysis_info["unitcell"]:     
-        #バンド端補正を行なったか判断
-        if piseset.functional == "pbesol":
-            band = "band_nsc"
-        else:
-            band = "band" 
-        #unitcellの計算が完了しているか確認
-        if calc_info["unitcell"][band] and calc_info["unitcell"]["dielectric"] and calc_info["unitcell"]["abs"]:
-            print("Analyzing unitcell.")
-            os.chdir("unitcell") 
-            subprocess.run([f"pydefect_vasp u -vb {band}/vasprun.xml -ob {band}/OUTCAR-finish -odc dielectric/OUTCAR-finish -odi dielectric/OUTCAR-finish"], shell=True)
-            flag = check_analysis_done("unitcell.yaml")
-
-            os.chdir(band)
-            plot_pdf("band.pdf", "vise pb")
-            pdf_to_png("band.pdf", "./")
-            os.chdir("../")
-
-            os.chdir("dos")
-            if not os.path.isfile("effective_mass.json"):
-                subprocess.run(["vise em -t 300 -c 16"], shell=True)
-            plot_pdf("dos.pdf", "vise pd")
-            pdf_to_png("dos.pdf", "./")
-            os.chdir("../")
-
-            os.chdir("abs")
-            plot_pdf("absorption_coeff.pdf", "vise pdf -ckk")
-            pdf_to_png("absorption_coeff.pdf", "./")
-            os.chdir("../")
-
-            os.chdir("../")
-        elif not calc_info["unitcell"][band]:
-            print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
-            flag = False
-        elif not calc_info["unitcell"]["dielectric"]:
-            print("dielectric calculations have not finished yet. So analysis of unitcell will be skipped.")
-            flag = False
-        elif not calc_info["unitcell"]["abs"]:
-            print("abs calculations have not finished yet. So analysis of unitcell will be skipped.")
-            flag = False
-    else:
-        print("Analysis of unitcell has already finished.")
+    if analysis_info["unitcell"]:
         flag = True
+        print("Analysis of unitcell has already finished.")
+        return flag
+
+    #バンド端補正を行なったか判断
+    if piseset.functional == "pbesol":
+        band = "band_nsc"
+    else:
+        band = "band"
+
+    #unitcellの計算が完了しているか確認
+    if calc_info["unitcell"][band] and calc_info["unitcell"]["dielectric"] and calc_info["unitcell"]["abs"]:
+        print("Analyzing unitcell.")
+        os.chdir("unitcell") 
+        subprocess.run([f"pydefect_vasp u -vb {band}/vasprun.xml -ob {band}/OUTCAR-finish -odc dielectric/OUTCAR-finish -odi dielectric/OUTCAR-finish"], shell=True)
+        flag = check_analysis_done("unitcell.yaml")
+
+        os.chdir(band)
+        plot_pdf("band.pdf", "vise pb")
+        pdf_to_png("band.pdf", "./")
+        os.chdir("../")
+
+        os.chdir("dos")
+        if not os.path.isfile("effective_mass.json"):
+            subprocess.run(["vise em -t 300 -c 16"], shell=True)
+        plot_pdf("dos.pdf", "vise pd")
+        pdf_to_png("dos.pdf", "./")
+        os.chdir("../")
+
+        os.chdir("abs")
+        plot_pdf("absorption_coeff.pdf", "vise pdf -ckk")
+        pdf_to_png("absorption_coeff.pdf", "./")
+        os.chdir("../")
+
+        os.chdir("../")
+    elif not calc_info["unitcell"][band]:
+        print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
+        flag = False
+    elif not calc_info["unitcell"]["dielectric"]:
+        print("dielectric calculations have not finished yet. So analysis of unitcell will be skipped.")
+        flag = False
+    elif not calc_info["unitcell"]["abs"]:
+        print("abs calculations have not finished yet. So analysis of unitcell will be skipped.")
+        flag = False
+
     return flag
 
 def analysis_cpd(target_material, calc_info, analysis_info):
     #cpdが解析済みかどうか確認
-    if not analysis_info["cpd"]:
-        #cpdの計算が完了しているか確認
-        if check_calc_alldone(calc_info["cpd"].values()):
-            print("Analyzing cpd.")
-            os.chdir("cpd") 
-            if not os.path.isdir("host"):
-                subprocess.run(["ln -s ../unitcell/opt host"], shell=True)
-            if not os.path.isfile("composition_energies.yaml"):
-                subprocess.run(["pydefect_vasp mce -d */"], shell=True)
-            if not os.path.isfile("relative_energies.yaml"):
-                subprocess.run(["pydefect sre"], shell=True)
-            if not os.path.isfile("target_vertices.yaml"):
-                subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
-            flag = check_analysis_done("target_vertices.yaml")
-
-            #unstable errorに対処し、target_vertices.yamlを作成する
-            while not flag:
-                with open("relative_energies.yaml") as file:
-                    relative_energies = yaml.safe_load(file)
-                    try:
-                        relative_energies[target_material.formula_pretty] -= 0.01
-                    except KeyError:
-                        print(f"Target {target_material.formula_pretty} is not in relative energy compounds, so stop here.")
-                        break
-                with open("relative_energies.yaml", 'w') as file:
-                    yaml.dump(relative_energies, file)
-                subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
-                flag = check_analysis_done("target_vertices.yaml")
-
-            subprocess.run(["pydefect pc"], shell=True)
-            if os.path.isfile("cpd.pdf"):
-                pdf_to_png("cpd.pdf", "./")
-            os.chdir("../") 
-        else:
-            print("cpd calculations have not finished yet. So analysis of cpd will be skipped.")
-            flag = False
-    else:
+    if analysis_info["cpd"]:
         print("Analysis of cpd has already finished.")
         flag = True
+        return flag
+    
+    #cpdの計算が完了しているか確認
+    if not check_calc_alldone(calc_info["cpd"].values()):
+        print("cpd calculations have not finished yet. So analysis of cpd will be skipped.")
+        flag = False
+        return flag
 
+    print("Analyzing cpd.")
+    os.chdir("cpd") 
+    if not os.path.isdir("host"):
+        subprocess.run(["ln -s ../unitcell/opt host"], shell=True)
+    if not os.path.isfile("composition_energies.yaml"):
+        subprocess.run(["pydefect_vasp mce -d */"], shell=True)
+    if not os.path.isfile("relative_energies.yaml"):
+        subprocess.run(["pydefect sre"], shell=True)
+    if not os.path.isfile("target_vertices.yaml"):
+        subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+    flag = check_analysis_done("target_vertices.yaml")
+
+    avoid_unstable_error(flag, target_material)
+
+    #cpd.pdfを作成し、pngとして保存する
+    subprocess.run(["pydefect pc"], shell=True)
+    if os.path.isfile("cpd.pdf"):
+        pdf_to_png("cpd.pdf", "./")
+
+    os.chdir("../") 
     return flag
 
 def analysis_defect(calc_info, analysis_info):
-    #defectが解析済みかどうかと解析可能な状況なのか確認
-    if not analysis_info["defect"] and analysis_info["unitcell"] and analysis_info["cpd"]:
-        #defectの計算が完了しているか確認
-        if check_calc_alldone(calc_info["defect"].values()):
-            print("Analyzing defect.")
-            os.chdir("defect") 
-            subprocess.run(["pydefect_vasp cr -d *_*/ perfect"], shell=True)
-            subprocess.run(["pydefect efnv -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml"], shell=True)
-            subprocess.run(["pydefect dsi -d *_*/"], shell=True)
-            subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
-            subprocess.run(["pydefect dsi -d *_*/"], shell=True)
-            subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
-            subprocess.run(["pydefect_vasp pbes -d perfect"], shell=True)
-            subprocess.run(["pydefect_vasp beoi -d *_* -pbes perfect/perfect_band_edge_state.json"], shell=True)
-            subprocess.run(["pydefect bes -d *_*/ -pbes perfect/perfect_band_edge_state.json"], shell=True)
-            subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
-            subprocess.run(["pydefect des -d *_*/ -u ../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
-            subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
-
-            labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-            plot_energy_diagram(labels)
-            flag = check_analysis_done("energy_A.pdf")
-
-            os.chdir("../") 
-        else:
-            print("defect calculations have not finished yet.")
-            flag = False
-
-    elif analysis_info["defect"]:
+    #defectが解析済みかどうか確認
+    if analysis_info["defect"]:
         print("Analysis of defect has already finished.")
         flag = True
-    elif analysis_info["unitcell"] and not analysis_info["cpd"]:
-        print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
-        flag = False
-    elif not analysis_info["unitcell"] and analysis_info["cpd"]:
+        return flag
+    
+    #unitcellが解析済みかどうか確認
+    if not analysis_info["unitcell"]:
         print("Analysis of unitcell has not finished yet. So analysis of defect will be skipped.")
         flag = False
-    elif not analysis_info["unitcell"] and not analysis_info["cpd"]:
-        print("Analysis of unitcell and cpd have not finished yet. So analysis of defect will be skipped.")
+        return flag
+    
+    #unitcellが解析済みかどうか確認
+    if not analysis_info["cpd"]:
+        print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
         flag = False
+        return flag
 
+    #defectの計算が完了しているか確認
+    if not check_calc_alldone(calc_info["defect"].values()):
+        print("defect calculations have not finished yet. So analysis of defect will be skipped.")
+        flag = False
+        return flag
+
+    print("Analyzing defect.")
+    os.chdir("defect") 
+    subprocess.run(["pydefect_vasp cr -d *_*/ perfect"], shell=True)
+    subprocess.run(["pydefect efnv -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml"], shell=True)
+    subprocess.run(["pydefect dsi -d *_*/"], shell=True)
+    subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
+    subprocess.run(["pydefect dsi -d *_*/"], shell=True)
+    subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
+    subprocess.run(["pydefect_vasp pbes -d perfect"], shell=True)
+    subprocess.run(["pydefect_vasp beoi -d *_* -pbes perfect/perfect_band_edge_state.json"], shell=True)
+    subprocess.run(["pydefect bes -d *_*/ -pbes perfect/perfect_band_edge_state.json"], shell=True)
+    subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
+    subprocess.run(["pydefect des -d *_*/ -u ../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
+    subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
+
+    labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
+    plot_energy_diagram(labels)
+    flag = check_analysis_done("energy_A_default.pdf")
+
+    os.chdir("../") 
+        
     return flag
 
 def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
     #dopantのcpdが解析済みかどうか確認
-    if not analysis_info[f"{dopant}_cpd"] and analysis_info["cpd"]:
-        #dopantのcpdフォルダがあるか確認
-        if os.path.isdir(f"dopant_{dopant}/cpd"):
-            #dopantのcpdの計算が完了しているか確認
-            if check_calc_alldone(calc_info[f"dopant_{dopant}"]["cpd"].values()):
-                print(f"Analyzing dopant_{dopant}'s cpd.")
-                os.chdir(f"dopant_{dopant}/cpd")
-                #host情報をシンボリックリンクで持ってくる 
-                if not os.path.isdir("host"):
-                    subprocess.run(["ln -s ../../unitcell/opt host"], shell=True)
-
-                #無添加相のcpdの情報をシンボリックリンクで持ってくる
-                for cpd_dir_name in calc_info["cpd"].keys():
-                    if not os.path.isdir(cpd_dir_name):
-                        subprocess.run([f"ln -s ../../cpd/{cpd_dir_name} ./"], shell=True)
-                
-                if not os.path.isfile("composition_energies.yaml"):
-                    subprocess.run(["pydefect_vasp mce -d */"], shell=True)
-                if not os.path.isfile("relative_energies.yaml"):
-                    subprocess.run(["pydefect sre"], shell=True)
-                if not os.path.isfile("target_vertices.yaml"):
-                    pydefect_cv_dopant(target_material, dopant)
-                flag = check_analysis_done("target_vertices.yaml")
-
-                #unstable errorに対処し、target_vertices.yamlを作成する
-                while not flag:
-                    with open("relative_energies.yaml") as file:
-                        relative_energies = yaml.safe_load(file)
-                        try:
-                            relative_energies[target_material.formula_pretty] -= 0.01
-                        except KeyError:
-                            print(f"Target {target_material.formula_pretty} is not in relative energy compounds, so stop here.")
-                            break
-                    with open("relative_energies.yaml", 'w') as file:
-                        yaml.dump(relative_energies, file)
-
-                    pydefect_cv_dopant(target_material, dopant)
-                    flag = check_analysis_done("target_vertices.yaml")
-                
-                #target_verticesを修正する
-                reduced_cpd(dopant)
-                # for element in target_material.elements:
-                #     reduced_cpd(element)
-
-                if os.path.isfile("chem_pot_diag.json"):
-                    subprocess.run(["pydefect pc"], shell=True)
-                if os.path.isfile("cpd.pdf"):
-                    pdf_to_png("cpd.pdf", "./")
-                os.chdir("../../") 
-            else:
-                print(f"dopant_{dopant}'s cpd calculations have not finished yet. So analysis of dopant_{dopant}'s cpd will be skipped.")
-                flag = False
-        else:
-            print(f"No such directory: cpd in dopant_{dopant}")
-            flag = False
-    elif analysis_info[f"{dopant}_cpd"]:
-        print(f"Analysis of dopant_{dopant}'s cpd has already finished.")
+    if analysis_info[f"{dopant}_cpd"]:
+        print(f"Analysis of {dopant}_cpd has already finished.")
         flag = True
-    elif not analysis_info["cpd"]:
-        print(f"Analysis of cpd has not yet finished. So analysis of dopant_{dopant}'s cpd will be skipped.")
+        return flag
+    
+    #cpdが解析済みかどうか確認
+    if not analysis_info["cpd"]:
+        print(f"Analysis of cpd has not finished yet. So analysis of {dopant}_cpd will be skipped.")
         flag = False
+        return flag
+    
+    #dopantのcpdフォルダがあるか確認
+    if not os.path.isdir(f"dopant_{dopant}/cpd"):
+        print(f"No such directory: cpd in dopant_{dopant}")
+        flag = False
+        return flag
 
+    #dopantのcpdの計算が完了しているか確認
+    if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["cpd"].values()):
+        print(f"dopant_{dopant}'s cpd calculations have not finished yet. So analysis of dopant_{dopant}'s cpd will be skipped.")
+        flag = False
+        return flag
+
+    print(f"Analyzing dopant_{dopant}'s cpd.")
+    os.chdir(f"dopant_{dopant}/cpd")
+    #host情報をシンボリックリンクで持ってくる 
+    if not os.path.isdir("host"):
+        subprocess.run(["ln -s ../../unitcell/opt host"], shell=True)
+
+    #無添加相のcpdの情報をシンボリックリンクで持ってくる
+    for cpd_dir_name in calc_info["cpd"].keys():
+        if not os.path.isdir(cpd_dir_name):
+            subprocess.run([f"ln -s ../../cpd/{cpd_dir_name} ./"], shell=True)
+    
+    #cpdの解析を行う
+    if not os.path.isfile("composition_energies.yaml"):
+        subprocess.run(["pydefect_vasp mce -d */"], shell=True)
+    if not os.path.isfile("relative_energies.yaml"):
+        subprocess.run(["pydefect sre"], shell=True)
+    if not os.path.isfile("target_vertices.yaml"):
+        pydefect_cv_dopant(target_material, dopant)
+    flag = check_analysis_done("target_vertices.yaml")
+
+    avoid_unstable_error(flag, target_material, dopant)
+    
+    #target_verticesを修正する（pydefectにエラーがある）
+    reduced_cpd(dopant)
+
+    if os.path.isfile("chem_pot_diag.json"):
+        subprocess.run(["pydefect pc"], shell=True)
+    if os.path.isfile("cpd.pdf"):
+        pdf_to_png("cpd.pdf", "./")
+    os.chdir("../../") 
+        
     return flag
 
 def analysis_dopant_defect(dopant, calc_info, analysis_info):
     #dopantのdefectが解析済みかどうか確認
-    if not analysis_info[f"{dopant}_defect"] and analysis_info["defect"] and analysis_info[f"{dopant}_cpd"]:
-        #dopnatのdefectフォルダがあるか確認
-        if os.path.isdir(f"dopant_{dopant}/defect"):
-            #dopantのdefectの計算が完了しているか確認
-            if check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
-                print(f"Analyzing dopant_{dopant}'s defect.")
-                os.chdir(f"dopant_{dopant}/defect") 
-                if not os.path.isdir("perfect"):
-                        subprocess.run([f"ln -s ../../defect/perfect ./"], shell=True)
-
-                subprocess.run(["pydefect_vasp cr -d *_*/ perfect"], shell=True)
-                subprocess.run(["pydefect efnv -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml"], shell=True)
-                subprocess.run(["pydefect dsi -d *_*/"], shell=True)
-                subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
-                subprocess.run(["pydefect dsi -d *_*/"], shell=True)
-                subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
-                subprocess.run(["pydefect_vasp pbes -d perfect"], shell=True)
-                subprocess.run(["pydefect_vasp beoi -d *_* -pbes perfect/perfect_band_edge_state.json"], shell=True)
-                subprocess.run(["pydefect bes -d *_*/ -pbes perfect/perfect_band_edge_state.json"], shell=True)
-
-                #無添加相のdefectの情報をシンボリックリンクで持ってくる
-                for defect_dir_name in calc_info["defect"].keys():
-                    if not os.path.isdir(defect_dir_name):
-                        subprocess.run([f"ln -s ../../defect/{defect_dir_name} ./"], shell=True)
-
-                subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
-                subprocess.run(["pydefect des -d *_*/ -u ../../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
-                subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
-                    
-                #化学ポテンシャルの極限の条件のラベルを取得
-                labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-                plot_energy_diagram(labels)
-
-                flag = check_analysis_done("energy_A.pdf")
-
-                os.chdir("../../")
-            else:
-                print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
-                flag = False
-        else:
-            print(f"No such directory: dopant_{dopant}'s defect")
-            flag = False
-    elif analysis_info[f"{dopant}_defect"]:
-        print(f"Analysis of dopant_{dopant}'s defect has already finished.")
+    if analysis_info[f"{dopant}_defect"]:
+        print(f"Analysis of {dopant}_defect has already finished.")
         flag = True
-    elif not analysis_info["defect"] and analysis_info[f"{dopant}_cpd"]:
-        print(f"Analysis of defect has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        return flag
+    
+    #defectが解析済みかどうか確認
+    if not analysis_info["defect"]:
+        print(f"Analysis of defect has not finished yet. So analysis of {dopant}_defect will be skipped.")
         flag = False
-    elif not analysis_info[f"{dopant}_cpd"] and analysis_info["defect"]:
-        print(f"Analysis of {dopant}_cpd has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        return flag
+    
+    #dopantのcpdが解析済みかどうか確認
+    if not analysis_info[f"{dopant}_cpd"]:
+        print(f"Analysis of {dopant}_cpd has not finished yet. So analysis of {dopant}_defect will be skipped.")
         flag = False
-    elif not analysis_info[f"{dopant}_cpd"] and not analysis_info["defect"]:
-        print(f"Analysis of defect and {dopant}_cpd have not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        return flag
+
+    #dopnatのdefectフォルダがあるか確認
+    if not os.path.isdir(f"dopant_{dopant}/defect"):
+        print(f"No such directory: dopant_{dopant}'s defect")
         flag = False
+        return flag
+    
+    #dopantのdefectの計算が完了しているか確認
+    if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
+        print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
+        flag = False
+        return flag
+    
+    print(f"Analyzing dopant_{dopant}'s defect.")
+    os.chdir(f"dopant_{dopant}/defect") 
+    if not os.path.isdir("perfect"):
+            subprocess.run([f"ln -s ../../defect/perfect ./"], shell=True)
+
+    subprocess.run(["pydefect_vasp cr -d *_*/ perfect"], shell=True)
+    subprocess.run(["pydefect efnv -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml"], shell=True)
+    subprocess.run(["pydefect dsi -d *_*/"], shell=True)
+    subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
+    subprocess.run(["pydefect dsi -d *_*/"], shell=True)
+    subprocess.run(["pydefect_util dvf -d *_*"], shell=True)
+    subprocess.run(["pydefect_vasp pbes -d perfect"], shell=True)
+    subprocess.run(["pydefect_vasp beoi -d *_* -pbes perfect/perfect_band_edge_state.json"], shell=True)
+    subprocess.run(["pydefect bes -d *_*/ -pbes perfect/perfect_band_edge_state.json"], shell=True)
+
+    #無添加相のdefectの情報をシンボリックリンクで持ってくる
+    for defect_dir_name in calc_info["defect"].keys():
+        if not os.path.isdir(defect_dir_name):
+            subprocess.run([f"ln -s ../../defect/{defect_dir_name} ./"], shell=True)
+
+    subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
+    subprocess.run(["pydefect des -d *_*/ -u ../../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
+    subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
+        
+    #化学ポテンシャルの極限の条件のラベルを取得
+    labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
+    plot_energy_diagram(labels)
+
+    flag = check_analysis_done("energy_A_default.pdf")
+
+    os.chdir("../../")
+        
 
     return flag
 
-#欠陥形成エネルギー図の作成のみを行う
 def analysis_defect_plot(calc_info, analysis_info):
-    #defectが解析済みかどうかと解析可能な状況なのか確認
-    if not analysis_info["defect"] and analysis_info["unitcell"] and analysis_info["cpd"]:
-        #defectの計算が完了しているか確認
-        if check_calc_alldone(calc_info["defect"].values()):
-            print("Analyzing defect.")
-            os.chdir("defect") 
-
-            subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
-            subprocess.run(["pydefect des -d *_*/ -u ../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
-            subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
-            
-            labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-            plot_energy_diagram(labels)
-            flag = check_analysis_done("energy_A.pdf")
-
-            os.chdir("../") 
-        else:
-            print("defect calculations have not finished yet.")
-            flag = False
-
-    elif analysis_info["defect"]:
+    #defectが解析済みかどうか確認
+    if analysis_info["defect"]:
         print("Analysis of defect has already finished.")
         flag = True
-    elif analysis_info["unitcell"] and not analysis_info["cpd"]:
-        print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
-        flag = False
-    elif not analysis_info["unitcell"] and analysis_info["cpd"]:
+        return flag
+    
+    #unitcellが解析済みかどうか確認
+    if not analysis_info["unitcell"]:
         print("Analysis of unitcell has not finished yet. So analysis of defect will be skipped.")
         flag = False
-    elif not analysis_info["unitcell"] and not analysis_info["cpd"]:
-        print("Analysis of unitcell and cpd have not finished yet. So analysis of defect will be skipped.")
+        return flag
+    
+    #unitcellが解析済みかどうか確認
+    if not analysis_info["cpd"]:
+        print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
         flag = False
+        return flag
+
+    #defectの計算が完了しているか確認
+    if not check_calc_alldone(calc_info["defect"].values()):
+        print("defect calculations have not finished yet. So analysis of defect will be skipped.")
+        flag = False
+        return flag
+
+    print("Analyzing defect.")
+    os.chdir("defect") 
+
+    subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
+    subprocess.run(["pydefect des -d *_*/ -u ../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
+    subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
+    
+    labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
+    plot_energy_diagram(labels)
+    flag = check_analysis_done("energy_A.pdf")
+
+    os.chdir("../") 
 
     return flag
 
 def analysis_dopant_defect_plot(dopant, calc_info, analysis_info):
     #dopantのdefectが解析済みかどうか確認
-    if not analysis_info[f"{dopant}_defect"] and analysis_info["defect"] and analysis_info[f"{dopant}_cpd"]:
-        #dopnatのdefectフォルダがあるか確認
-        if os.path.isdir(f"dopant_{dopant}/defect"):
-            #dopantのdefectの計算が完了しているか確認
-            if check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
-                print(f"Analyzing dopant_{dopant}'s defect.")
-                os.chdir(f"dopant_{dopant}/defect") 
-
-                subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
-                subprocess.run(["pydefect des -d *_*/ -u ../../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
-                subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
-                    
-                #化学ポテンシャルの極限の条件のラベルを取得
-                labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-                plot_energy_diagram(labels)
-                flag = check_analysis_done("energy_A.pdf")
-
-                os.chdir("../../")
-            else:
-                print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
-                flag = False
-        else:
-            print(f"No such directory: dopant_{dopant}'s defect")
-            flag = False
-    elif analysis_info[f"{dopant}_defect"]:
-        print(f"Analysis of dopant_{dopant}'s defect has already finished.")
+    if analysis_info[f"{dopant}_defect"]:
+        print(f"Analysis of {dopant}_defect has already finished.")
         flag = True
-    elif not analysis_info["defect"] and analysis_info[f"{dopant}_cpd"]:
-        print(f"Analysis of defect has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        return flag
+    
+    #defectが解析済みかどうか確認
+    if not analysis_info["defect"]:
+        print(f"Analysis of defect has not finished yet. So analysis of {dopant}_defect will be skipped.")
         flag = False
-    elif not analysis_info[f"{dopant}_cpd"] and analysis_info["defect"]:
-        print(f"Analysis of {dopant}_cpd has not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        return flag
+    
+    #dopantのcpdが解析済みかどうか確認
+    if not analysis_info[f"{dopant}_cpd"]:
+        print(f"Analysis of {dopant}_cpd has not finished yet. So analysis of {dopant}_defect will be skipped.")
         flag = False
-    elif not analysis_info[f"{dopant}_cpd"] and not analysis_info["defect"]:
-        print(f"Analysis of defect and {dopant}_cpd have not yet finished. So analysis of dopant_{dopant}'s defect will be skipped.")
+        return flag
+
+    #dopnatのdefectフォルダがあるか確認
+    if not os.path.isdir(f"dopant_{dopant}/defect"):
+        print(f"No such directory: dopant_{dopant}'s defect")
         flag = False
+        return flag
+    
+    #dopantのdefectの計算が完了しているか確認
+    if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
+        print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
+        flag = False
+        return flag
+    
+    print(f"Analyzing dopant_{dopant}'s defect.")
+    os.chdir(f"dopant_{dopant}/defect") 
+
+    subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
+    subprocess.run(["pydefect des -d *_*/ -u ../../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
+    subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
+        
+    #化学ポテンシャルの極限の条件のラベルを取得
+    labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
+    plot_energy_diagram(labels)
+    flag = check_analysis_done("energy_A.pdf")
+
+    os.chdir("../../")
 
     return flag
 

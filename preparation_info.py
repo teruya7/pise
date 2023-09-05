@@ -103,167 +103,199 @@ def preparation_opt(piseset, material_id, formula_pretty):
                 subprocess.run([piseset.vise_task_command_opt], shell=True)
             
 def preparation_unitcell(piseset, calc_info, preparation_info):
-    if not preparation_info["unitcell"] and calc_info["unitcell"]["opt"]:
-        print("Preparing unitcell.")
-        os.chdir("unitcell")
-        #汎関数によって処理を分ける
-        prepare_input_files(piseset, "band", piseset.vise_task_command_band, "band")
-        prepare_input_files(piseset, "dos", piseset.vise_task_command_dos, "dos")
-
-        #格子間Hの配置の候補を考えるために精度の高い計算でCHGCAR, LOCPOT, ELFCARの出力する
-        if piseset.dopants is not None:
-            if "H" in piseset.dopants:
-                prepare_input_files(piseset, "dos_accurate", piseset.vise_task_command_dos_accurate, "dos")
-
-        prepare_input_files(piseset, "abs", piseset.vise_task_command_abs, "abs")
-        if piseset.functional == "pbesol": 
-            prepare_input_files(piseset, "dielectric", piseset.vise_task_command_dielectric, "dielectric")
-            prepare_input_files(piseset, "dielectric_rpa", piseset.vise_task_command_dielectric_rpa, "dielectric_rpa")
-        else:
-            prepare_input_files(piseset, "dielectric", piseset.vise_task_command_dielectric_hybrid, "dielectric")
-        os.chdir("../")
-        flag = True
-    elif preparation_info["unitcell"]:
+    #unitcellが準備済みか確認
+    if preparation_info["unitcell"]:
         print("Preparation of unitcell has already finished.")
         flag = True
-    elif not calc_info["unitcell"]["opt"]:
+        return flag
+    
+    #optの計算が完了しているか確認
+    if not calc_info["unitcell"]["opt"]:
         print("opt calculations have not finished yet. So preparing unitcell will be skipped.")
         flag = False
+        return flag
+    
+    print("Preparing unitcell.")
+    os.chdir("unitcell")
+    prepare_input_files(piseset, "band", piseset.vise_task_command_band, "band")
+    prepare_input_files(piseset, "dos", piseset.vise_task_command_dos, "dos")
+
+    #格子間Hの配置の候補を考えるために精度の高い計算でCHGCAR, LOCPOT, ELFCARの出力する
+    if piseset.dopants is not None:
+        if "H" in piseset.dopants:
+            prepare_input_files(piseset, "dos_accurate", piseset.vise_task_command_dos_accurate, "dos")
+
+    prepare_input_files(piseset, "abs", piseset.vise_task_command_abs, "abs")
+
+    if piseset.functional == "pbesol": 
+        prepare_input_files(piseset, "dielectric", piseset.vise_task_command_dielectric, "dielectric")
+        prepare_input_files(piseset, "dielectric_rpa", piseset.vise_task_command_dielectric_rpa, "dielectric_rpa")
+    else:
+        prepare_input_files(piseset, "dielectric", piseset.vise_task_command_dielectric_hybrid, "dielectric")
+    
+    os.chdir("../")
+    flag = True
+
     return flag
 
 def preparation_band_nsc(piseset, calc_info, preparation_info):
-    if not preparation_info["band_nsc"] and calc_info["unitcell"]["band"] and calc_info["unitcell"]["dielectric_rpa"] and os.path.isfile("unitcell/band/WAVECAR"):
-        print("Preparing band_nsc.")
-        os.chdir("unitcell")
-        aexx = calc_aexx("dielectric_rpa/vasprun.xml")
-        os.makedirs("band_nsc", exist_ok=True)
-        os.chdir("band_nsc")
-
-        #vise.yamlを作成
-        vise_yaml = piseset.vise_yaml
-        with open("vise.yaml", "w") as f:
-            vise_yaml["options"]["set_hubbard_u"] = False
-            yaml.dump(vise_yaml, f, sort_keys=False)
-
-        if not check_preparation_done():
-            prepare_job_script(piseset, "band_nsc")
-            subprocess.run([f"{piseset.vise_task_command_band_nsc} {aexx}"], shell=True)
-            subprocess.run(["cp ../band/WAVECAR ./"], shell=True)
-        os.chdir("../../")
-
-        #aexx_info.jsonに保存
-        aexx_info = defaultdict(dict)
-        aexx_info["AEXX"] = aexx
-        with open("aexx_info.json", "w") as f:
-            json.dump(aexx_info, f, indent=4)
-        flag = True
-    elif preparation_info["band_nsc"]:
+    if preparation_info["band_nsc"]:
         print("Preparation of band_nsc has already finished.")
         flag = True
-    elif not calc_info["unitcell"]["band"] and calc_info["unitcell"]["dielectric_rpa"]:
+        return flag
+    
+    if not calc_info["unitcell"]["band"]:
         print("Caluculation of band has not finished yet. So preparing band_nsc will be skipped.")
         flag = False
-    elif calc_info["unitcell"]["band"] and not calc_info["unitcell"]["dielectric_rpa"]:
+        return flag
+    
+    if not calc_info["unitcell"]["dielectric_rpa"]:
         print("Caluculation of dielectric_rpa has not finished yet. So preparing band_nsc will be skipped.")
         flag = False
-    elif not calc_info["unitcell"]["band"] and not calc_info["unitcell"]["dielectric_rpa"]:
-        print("Caluculation of band and dielectric_rpa have not finished yet. So preparing band_nsc will be skipped.")
+        return flag
+    
+    if not os.path.isfile("unitcell/band/WAVECAR"):
+        print("No such file: WAVECAR")
         flag = False
+        return flag
+
+    print("Preparing band_nsc.")
+    os.chdir("unitcell")
+    aexx = calc_aexx("dielectric_rpa/vasprun.xml")
+    os.makedirs("band_nsc", exist_ok=True)
+    os.chdir("band_nsc")
+
+    #vise.yamlを作成
+    vise_yaml = piseset.vise_yaml
+    with open("vise.yaml", "w") as f:
+        vise_yaml["options"]["set_hubbard_u"] = False
+        yaml.dump(vise_yaml, f, sort_keys=False)
+
+    if not check_preparation_done():
+        prepare_job_script(piseset, "band_nsc")
+        subprocess.run([f"{piseset.vise_task_command_band_nsc} {aexx}"], shell=True)
+        subprocess.run(["cp ../band/WAVECAR ./"], shell=True)
+    os.chdir("../../")
+
+    #aexx_info.jsonに保存
+    aexx_info = defaultdict(dict)
+    aexx_info["AEXX"] = aexx
+    with open("aexx_info.json", "w") as f:
+        json.dump(aexx_info, f, indent=4)
+    flag = True
+
     return flag
         
 def preparation_cpd(piseset, preparation_info, elements):
-    if not preparation_info["cpd"]:
-        print("Preparing cpd.")
-        os.makedirs("cpd", exist_ok=True)
-        os.chdir("cpd")
+    if preparation_info["cpd"]:
+        print("Preparation of cpd has already finished.")
+        flag = True
+        return flag
+    
+    print("Preparing cpd.")
+    os.makedirs("cpd", exist_ok=True)
+    os.chdir("cpd")
 
-        #競合相をMaterials projectから取得
-        if len(elements) == 2:
-            subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} --e_above_hull 0.0005"], shell=True)
-        elif len(elements) == 3:
-            subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} --e_above_hull 0.0005"], shell=True)
-        elif len(elements) == 4:
-            subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} {elements[3]} --e_above_hull 0.0005"], shell=True)
+    #競合相をMaterials projectから取得
+    if len(elements) == 2:
+        subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} --e_above_hull 0.0005"], shell=True)
+    elif len(elements) == 3:
+        subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} --e_above_hull 0.0005"], shell=True)
+    elif len(elements) == 4:
+        subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} {elements[3]} --e_above_hull 0.0005"], shell=True)
 
+    #計算インプットの作成
+    cpd_dir_list = make_dir_list()
+    for target_dir in cpd_dir_list:
+        prepare_input_files(piseset, target_dir, piseset.vise_task_command_opt, "opt")
+    
+    os.chdir("../")
+    flag = True
+
+    return flag
+
+def preparation_defect(piseset, calc_info, preparation_info):
+    if preparation_info["defect"]:
+        print("Preparation of defect has already finished.")
+        flag = True
+        return flag
+    
+    if not calc_info["unitcell"]["dos"]:
+        print("dos calculations have not finished yet. So preparing defect will be skipped.")
+        flag = False
+        return flag
+    
+    print("Preparing defect.")
+    os.makedirs("defect", exist_ok=True)
+    os.chdir("defect")
+    subprocess.run(["pydefect s -p ../unitcell/dos/POSCAR-finish --max_atoms 150"], shell=True)
+
+    if os.path.isfile("supercell_info.json"):
+        subprocess.run(["pydefect_vasp le -v ../unitcell/dos/repeat-*/AECCAR{0,2} -i all_electron_charge"], shell=True)
+        subprocess.run(["pydefect_util ai --local_extrema volumetric_data_local_extrema.json -i 1 2"], shell=True)
+        subprocess.run(["pydefect ds"], shell=True)
+        subprocess.run(["pydefect_vasp de"], shell=True)
+        
         #計算インプットの作成
-        cpd_dir_list = make_dir_list()
-        for target_dir in cpd_dir_list:
-            prepare_input_files(piseset, target_dir, piseset.vise_task_command_opt, "opt")
+        defect_dir_list = make_dir_list()
+        for target_dir in defect_dir_list:
+            prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
         
         os.chdir("../")
         flag = True
     else:
-        print("Preparation of cpd has already finished.")
-        flag = True
-    return flag
-
-def preparation_defect(piseset, calc_info, preparation_info):
-    if not preparation_info["defect"] and calc_info["unitcell"]["dos"]:
-        print("Preparing defect.")
-        os.makedirs("defect", exist_ok=True)
-        os.chdir("defect")
-        subprocess.run(["pydefect s -p ../unitcell/dos/POSCAR-finish --max_atoms 150"], shell=True)
-        if os.path.isfile("supercell_info.json"):
-            subprocess.run(["pydefect_vasp le -v ../unitcell/dos/repeat-*/AECCAR{0,2} -i all_electron_charge"], shell=True)
-            subprocess.run(["pydefect_util ai --local_extrema volumetric_data_local_extrema.json -i 1 2"], shell=True)
-            subprocess.run(["pydefect ds"], shell=True)
-            subprocess.run(["pydefect_vasp de"], shell=True)
-            
-            #計算インプットの作成
-            defect_dir_list = make_dir_list()
-            for target_dir in defect_dir_list:
-                prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
-            
-            os.chdir("../")
-            flag = True
-        else:
-            print("No such file: supercell_info.json")
-            flag = False
-
-        
-
-    elif not calc_info["unitcell"]["dos"]:
-        print("dos calculations have not finished yet. So preparing defect will be skipped.")
+        print("No such file: supercell_info.json")
+        os.chdir("../")
         flag = False
-
-    elif preparation_info["defect"]:
-        print("Preparation of defect has already finished.")
-        flag = True
+        
+        
     return flag
 
 def preparation_dopant_cpd(piseset, preparation_info, elements, dopant):
-    if not preparation_info[f"{dopant}_cpd"]:
-        print(f"Preparing {dopant}_cpd.")
-        os.makedirs(f"dopant_{dopant}", exist_ok=True)
-        os.chdir(f"dopant_{dopant}")
-        os.makedirs("cpd", exist_ok=True)
-        os.chdir("cpd")
-        cwd = os.getcwd()
-
-        #競合相をMaterials projectから取得
-        if len(elements) == 2:
-            subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {dopant} --e_above_hull 0.0005"], shell=True)
-        elif len(elements) == 3:
-            subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} {dopant} --e_above_hull 0.0005"], shell=True)
-        elif len(elements) == 4:
-            subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} {elements[3]} {dopant} --e_above_hull 0.0005"], shell=True)
-
-        #cpd内の重複を削除
-        delete_duplication("../../cpd", cwd)
-
-        #計算インプットの作成
-        cpd_dir_list = make_dir_list()
-        for target_dir in cpd_dir_list:
-            prepare_input_files(piseset, target_dir, piseset.vise_task_command_opt, "opt")
-        
-        os.chdir("../../")
-        flag = True
-    else:
+    if preparation_info[f"{dopant}_cpd"]:
         print(f"Preparation of {dopant}_cpd has already finished.")
         flag = True
+        return flag
+
+    print(f"Preparing {dopant}_cpd.")
+    os.makedirs(f"dopant_{dopant}", exist_ok=True)
+    os.chdir(f"dopant_{dopant}")
+    os.makedirs("cpd", exist_ok=True)
+    os.chdir("cpd")
+    cwd = os.getcwd()
+
+    #競合相をMaterials projectから取得
+    if len(elements) == 2:
+        subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {dopant} --e_above_hull 0.0005"], shell=True)
+    elif len(elements) == 3:
+        subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} {dopant} --e_above_hull 0.0005"], shell=True)
+    elif len(elements) == 4:
+        subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} {elements[3]} {dopant} --e_above_hull 0.0005"], shell=True)
+
+    #cpd内の重複を削除
+    delete_duplication("../../cpd", cwd)
+
+    #計算インプットの作成
+    cpd_dir_list = make_dir_list()
+    for target_dir in cpd_dir_list:
+        prepare_input_files(piseset, target_dir, piseset.vise_task_command_opt, "opt")
+    
+    os.chdir("../../")
+    flag = True
+
     return flag
 
 def preparation_dopant_defect(piseset, preparation_info, dopant):
+    if preparation_info[f"{dopant}_defect"]:
+        print(f"Preparation of {dopant}_defect has already finished.")
+        flag = True
+        return flag
+
+    if not preparation_info["defect"]:
+        print(f"defect preparation have not finished yet. So preparing {dopant}_defect will be skipped.")
+        flag = False
+        return flag
+
     if not preparation_info[f"{dopant}_defect"] and preparation_info["defect"]:
         print(f"Preparing {dopant}_defect.")
         os.makedirs(f"dopant_{dopant}", exist_ok=True)
@@ -283,50 +315,45 @@ def preparation_dopant_defect(piseset, preparation_info, dopant):
         os.chdir("../../")
         flag = True
 
-    elif not preparation_info["defect"]:
-        print(f"defect preparation have not finished yet. So preparing {dopant}_defect will be skipped.")
-        flag = False
-
-    elif preparation_info[f"{dopant}_defect"]:
-        print(f"Preparation of {dopant}_defect has already finished.")
-        flag = True
     return flag
 
 def preparation_selftrap(piseset, preparation_info):
-    if preparation_info["defect"]:
-        #preparetion_infoにkeyを追加
-        preparation_info.setdefault("selftrap",False)
-        if not preparation_info["selftrap"]:
-            print("Preparing selftrap.")
 
-            with open("pise_selftrap.yaml") as f:
-                pise_selftrap = yaml.safe_load(f)
-                target = pise_selftrap["target"]
-                charge = pise_selftrap["charge"]
-
-            os.makedirs("selftrap", exist_ok=True)
-            os.chdir("selftrap")
-            subprocess.run(["cp ../defect/supercell_info.json ./"], shell=True)
-            
-            with open("defect_in.yaml", mode='w') as f:
-                f.write(f"{target}_{target}1: {charge}\n")
-
-            subprocess.run(["pydefect_vasp de"], shell=True)
-            subprocess.run(["rm -r perfect"], shell=True)
-                
-            #計算インプットの作成
-            defect_dir_list = make_dir_list()
-            for target_dir in defect_dir_list:
-                prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
-            os.chdir("../")
-            flag = True
-        else:
-            print(f"Preparation of selftrap has already finished.")
-            flag = True
-
-    elif preparation_info["defect"]:
+    if not preparation_info["defect"]:
         print("Preparation of defect has not finished yet.")
         flag = False
+        return flag
+
+    #preparetion_infoにkeyを追加
+    preparation_info.setdefault("selftrap",False)
+    if not preparation_info["selftrap"]:
+        print("Preparing selftrap.")
+
+        with open("pise_selftrap.yaml") as f:
+            pise_selftrap = yaml.safe_load(f)
+            target = pise_selftrap["target"]
+            charge = pise_selftrap["charge"]
+
+        os.makedirs("selftrap", exist_ok=True)
+        os.chdir("selftrap")
+        subprocess.run(["cp ../defect/supercell_info.json ./"], shell=True)
+        
+        with open("defect_in.yaml", mode='w') as f:
+            f.write(f"{target}_{target}1: {charge}\n")
+
+        subprocess.run(["pydefect_vasp de"], shell=True)
+        subprocess.run(["rm -r perfect"], shell=True)
+            
+        #計算インプットの作成
+        defect_dir_list = make_dir_list()
+        for target_dir in defect_dir_list:
+            prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
+        os.chdir("../")
+        flag = True
+    else:
+        print(f"Preparation of selftrap has already finished.")
+        flag = True
+
     return flag
 
 

@@ -132,10 +132,10 @@ class MarkdownInfoMaker():
                         f.write(f"{summary}\n")
                         for label in summary_info["labels"]:
                             f.write(f"## {label}\n")
+                            f.write(f"### energy_{label}_-5_5\n")
                             f.write(f"![Alt text](defect/energy_{label}_-5_5.png)\n")
+                            f.write(f"### energy_{label}_default\n")
                             f.write(f"![Alt text](defect/energy_{label}_default.png)\n")
-                            f.write(f"![Alt text](defect/energy_{label}_-5_5_shallow.png)\n")
-                            f.write(f"![Alt text](defect/energy_{label}_default_shallow.png)\n")
                         if piseset.dopants is not None:
                             for dopant in piseset.dopants:
                                 f.write(f"# {dopant}\n")
@@ -148,10 +148,6 @@ class MarkdownInfoMaker():
                                     f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_-5_5.png)\n")
                                     f.write(f"### energy_{label}_default\n")
                                     f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_default.png)\n")
-                                    f.write(f"### energy_{label}_-5_5_shallow\n")
-                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_-5_5_shallow.png)\n")
-                                    f.write(f"### energy_{label}_default_shallow\n")
-                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_default_shallow.png)\n")
                     markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = True
                 else:
                     print("No such file: summary_info.json")
