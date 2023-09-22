@@ -77,7 +77,7 @@ class Error():
                 if self.piseset.dopants is not None:
                     for dopant in self.piseset.dopants:
                         print_error_path("cpd", error_info, cwd, dopant)
-                        print_error_path("cpd", error_info, cwd, dopant)
+                        print_error_path("defect", error_info, cwd, dopant)
                 if os.path.isfile("pise_selftrap.yaml"):
                     print_error_path("selftrap", error_info, cwd)
 

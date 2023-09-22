@@ -1,4 +1,3 @@
-
 from target import TargetHandler
 from calculation import Calculation, make_dir_list
 from pise_set import PiseSet
@@ -10,6 +9,15 @@ import shutil
 import pathlib
 import yaml
 from pymatgen.io.vasp.outputs import Vasprun
+
+#ファイルのリストを作成
+def make_file_list():
+    list = []
+    for f in os.listdir("./"):
+        if os.path.isfile(f):
+            if not os.path.islink(f):
+                list.append(f)
+    return list
 
 def delete_duplication(path_to_criteria, path_to_target):
     #元のパスの記録
@@ -325,38 +333,96 @@ def preparation_selftrap(piseset, preparation_info):
         flag = False
         return flag
 
-    #preparetion_infoにkeyを追加
-    preparation_info.setdefault("selftrap",False)
-    if not preparation_info["selftrap"]:
-        print("Preparing selftrap.")
-
-        with open("pise_selftrap.yaml") as f:
-            pise_selftrap = yaml.safe_load(f)
-            target = pise_selftrap["target"]
-            charge = pise_selftrap["charge"]
-
-        os.makedirs("selftrap", exist_ok=True)
-        os.chdir("selftrap")
-        subprocess.run(["cp ../defect/supercell_info.json ./"], shell=True)
-        
-        with open("defect_in.yaml", mode='w') as f:
-            f.write(f"{target}_{target}1: {charge}\n")
-
-        subprocess.run(["pydefect_vasp de"], shell=True)
-        subprocess.run(["rm -r perfect"], shell=True)
-            
-        #計算インプットの作成
-        defect_dir_list = make_dir_list()
-        for target_dir in defect_dir_list:
-            prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
-        os.chdir("../")
-        flag = True
-    else:
+    if preparation_info["selftrap"]:
         print(f"Preparation of selftrap has already finished.")
         flag = True
+        return flag
+    
+    print("Preparing selftrap.")
+    os.makedirs("selftrap", exist_ok=True)
+    os.chdir("selftrap")
 
+    subprocess.run(["cp ../defect/supercell_info.json ./"], shell=True)
+    with open('supercell_info.json') as f:
+        supercell_info = json.load(f)
+
+    with open("defect_in.yaml", mode='w') as f:
+        for site in supercell_info["sites"].keys():
+            f.write(f"{site[:-1]}_{site}: [-2, -1, 1, 2]\n")
+
+    subprocess.run(["pydefect_vasp de"], shell=True)
+    subprocess.run(["rm -r perfect"], shell=True)
+        
+    #計算インプットの作成
+    defect_dir_list = make_dir_list()
+    for target_dir in defect_dir_list:
+        prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
+    os.chdir("../")
+    flag = True
+        
     return flag
 
+def preparation_surface(piseset, calc_info, preparation_info):
+    if not calc_info["unitcell"]["opt"]:
+        print("Calculation of opt has not finished yet.")
+        flag = False
+        return flag
+    
+    if preparation_info["surface"]:
+        print(f"Preparation of surface has already finished.")
+        flag = True
+        return flag
+    
+    print("Preparing surface.")
+    os.makedirs("surface", exist_ok=True)
+    os.chdir("surface")
+
+    #vise_surface_yamlの作成
+    with open("vise.yaml", "w") as f:
+        yaml.dump(piseset.vise_surface_yaml, f, sort_keys=False)
+    
+    subprocess.run(["cp ../unitcell/opt/POSCAR-finish POSCAR"], shell=True)
+    subprocess.run([f"perl {piseset.path_to_tsubo} --unique_nonpolar {piseset.h} {piseset.k} {piseset.l} {piseset.cap} < POSCAR >| tempfile1"], shell=True)
+    subprocess.run([f"perl {piseset.path_to_tsubo} --termination_polarity_list tempfile1 < POSCAR >| tempfile2"], shell=True)
+    subprocess.run(["egrep 'A|B' tempfile2 >| tempfile3"], shell=True)
+    #slabモデルを作成
+    make_surface_log = subprocess.run([f"perl {piseset.path_to_tsubo} --slab_poscar_list tempfile3 {piseset.slab_thickness} {piseset.vaccum_thickness} < POSCAR | grep Nonpolar"], capture_output=True, text=True, shell=True).stdout
+    #出力例 Nonpolar type A surface: 1_0_0/POSCAR.NPA.0.E. cell_multiplicity: 13 (tsubo.perlの出力をいじる必要がある)
+    print(make_surface_log)
+
+    surface_target_info = []
+    for line in make_surface_log.splitlines():
+        splited_line = line.split()
+        surface_dict = defaultdict(dict)
+        #無極性表面のみを検討の対象とする
+        if splited_line[2] == "A" or splited_line[2] == "B":
+            surface_index = splited_line[4].split("/")[0]
+            identifier = splited_line[4].split("/")[1][7:]
+            cell_multiplicity = splited_line[6]
+            surface_dict["surface_index"] = surface_index
+            surface_dict["identifier"] = identifier
+            surface_dict["cell_multiplicity"] = cell_multiplicity
+            surface_target_info.append(surface_dict)
+    
+    for target in surface_target_info:
+        surface_index = target["surface_index"]
+        identifier = target["identifier"]
+        os.chdir(surface_index)
+        os.makedirs(identifier, exist_ok=True)
+        subprocess.run([f"cp POSCAR.{identifier} {identifier}/POSCAR"], shell=True)
+        prepare_input_files(piseset, identifier, piseset.vise_task_command_surface, "surface")
+        os.chdir("../")
+
+    #surface_info.jsonにデータを保存
+    with open("surface_target_info.json", "w") as f:
+        json.dump(surface_target_info, f, indent=4)
+
+    os.chdir("../")
+
+    flag = True
+        
+    return flag
+   
 
 class Preparation():
     def __init__(self):
@@ -371,6 +437,7 @@ class Preparation():
             preparation_target_list = ["unitcell","cpd", "defect"]
         else:
             preparation_target_list = ["unitcell","cpd", "defect", "band_nsc"]
+
         if piseset.dopants is not None:
             for dopant in piseset.dopants:
                 preparation_target_list.append(f"{dopant}_cpd")
@@ -403,8 +470,13 @@ class Preparation():
                             preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
                             preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant)
                 
-                if os.path.isfile("pise_selftrap.yaml"):
+                if piseset.selftrap:
+                    preparation_info.setdefault("selftrap", False)
                     preparation_info["selftrap"] = preparation_selftrap(piseset, preparation_info)
+                
+                if piseset.surface:
+                    preparation_info.setdefault("surface", False)
+                    preparation_info["surface"] = preparation_surface(piseset, calc_info, preparation_info)
 
                 #preparation_info.jsonの保存
                 with open("preparation_info.json", "w") as f:

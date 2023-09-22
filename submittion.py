@@ -56,6 +56,16 @@ class Submittion():
                 submit_jobs(self.piseset, "cpd")
                 submit_jobs(self.piseset, "defect")
 
+                if self.piseset.selftrap:
+                    submit_jobs(self.piseset, "selftrap")
+
+                if self.piseset.surface and os.path.isdir("surface"):
+                    os.chdir("surface")
+                    surface_list = make_dir_list()
+                    for surface in surface_list:
+                        submit_jobs(self.piseset, surface)
+                    os.chdir("../")
+
                 if self.piseset.dopants is not None:
                     for dopant in self.piseset.dopants:
                         if os.path.isdir(f"dopant_{dopant}"):
@@ -63,8 +73,6 @@ class Submittion():
                             submit_jobs(self.piseset, "cpd")
                             submit_jobs(self.piseset, "defect")
                             os.chdir("../")
-                else:
-                    print("No dopants are considered.")
 
                 os.chdir("../../")
                 print()
@@ -86,7 +94,7 @@ class Submittion():
                 print(f"No such directory: {path}")
                 print()
 
-    #全てのtargetのunitcell,cpd,defectを対象にジョブを投げる
+    #全てのtargetのcpdを対象にジョブを投げる
     def cpd(self):
         for target in self.piseset.target_info:
             target_material = TargetHandler(target)
@@ -132,3 +140,40 @@ class Submittion():
                 print(f"No such directory: {path}")
                 print()
 
+    #全てのtargetのsurfaceを対象にジョブを投げる
+    def surface(self):
+        for target in self.piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(self.piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+
+                if self.piseset.surface:
+                    os.chdir("surface")
+                    surface_list = make_dir_list()
+                    for surface in surface_list:
+                        submit_jobs(self.piseset, surface)
+                    os.chdir("../")
+
+                os.chdir("../../")
+                print()
+            else:
+                print(f"No such directory: {path}")
+                print()
+
+    #全てのtargetのsurfaceを対象にジョブを投げる
+    def selftrap(self):
+        for target in self.piseset.target_info:
+            target_material = TargetHandler(target)
+            path = target_material.make_path(self.piseset.functional)
+            if os.path.isdir(path):
+                os.chdir(path)
+
+                if self.piseset.selftrap:
+                    submit_jobs(self.piseset, "selftrap")
+
+                os.chdir("../../")
+                print()
+            else:
+                print(f"No such directory: {path}")
+                print()

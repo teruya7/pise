@@ -8,12 +8,13 @@ submit_command: null
 submission_ready: ready_for_submission.txt
 job_script_path: null
 interstitial_explorer_path: null
+path_to_tsubo: null
 
 #job_scriptの設定
 job_script_small: run6.4.1_1.sh
 small_task: ["opt", "band", "dos", "abs"]
 job_script_large: run6.4.1_4.sh
-large_task: ["defect", "dielectric", "dielectric_rpa", "band_nsc"]
+large_task: ["defect", "dielectric", "dielectric_rpa", "band_nsc", "surface"]
 
 
 #vise_task_commandの設定
@@ -27,6 +28,7 @@ vise_task_command_dielectric_rpa: vise vs -t dielectric_dfpt -pd ../opt -uis LRP
 vise_task_command_dielectric_hybrid: vise vs -t dielectric_finite_field -d ../opt -uis IBRION 6
 vise_task_command_abs: vise vs -t dielectric_function -pd ../opt
 vise_task_command_defect: vise vs -t defect -uis SYMPREC 1e-4 --options only_even_num_kpts True
+vise_task_command_surface: vise vs -t defect -uis SYMPREC 1e-4 --options only_even_num_kpts True
 
 #vise_analysis_command
 vise_analysis_command_plot_band: vise pb
@@ -38,3 +40,11 @@ vise_analysis_command_unitcell_hybrid:  pydefect_vasp u -vb band/vasprun.xml -ob
 
 #マウントした時のlocalのパス
 local_path: null
+
+#surface
+slab_thickness: 20
+vaccum_thickness: 15
+h: 2
+k: 2
+l: 2
+cap: 2

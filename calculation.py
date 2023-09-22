@@ -22,7 +22,7 @@ def check_calc_done(path):
         else:
             flag_1 = False
 
-        if os.path.isfile("OUTCAR-finish"):    
+        if os.path.isfile("OUTCAR-finish") or os.path.isfile("OUTCAR"):    
             flag_2 = True
         else:
             flag_2 = False
@@ -38,30 +38,49 @@ def check_calc_done(path):
 
 #target_dirのsub_dirの計算が終わったかの情報をcalc_infoに記録
 def update_calc_info(target_dir, calc_info, unitcell_list=None, dopant=None):
-    if os.path.isdir(target_dir):
-        os.chdir(target_dir)
-        if unitcell_list is None:
-            if dopant is None:
-                dir_list = make_dir_list()
-                for sub_dir in dir_list:
-                    if check_calc_done(sub_dir):
-                        calc_info[target_dir][sub_dir] = True
-                    else:
-                        calc_info[target_dir][sub_dir] = False
+    if not os.path.isdir(target_dir):
+        return calc_info
+    
+    os.chdir(target_dir)
+
+    if target_dir == "unitcell": 
+        for unitcell_dir in unitcell_list:
+            if check_calc_done(unitcell_dir):
+                calc_info[target_dir][unitcell_dir] = True
             else:
-                dir_list = make_dir_list()
-                for sub_dir in dir_list:
-                    if check_calc_done(sub_dir):
-                        calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = True
-                    else:
-                        calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = False
-        else:
-            for unitcell_dir in unitcell_list:
-                if check_calc_done(unitcell_dir):
-                    calc_info[target_dir][unitcell_dir] = True
-                else:
-                    calc_info[target_dir][unitcell_dir] = False
+                calc_info[target_dir][unitcell_dir] = False
         os.chdir("../")
+        return calc_info
+
+    if target_dir == "surface":   
+        surface_list = make_dir_list()
+        for surface in surface_list:
+            os.chdir(surface)
+            dir_list = make_dir_list()
+            for sub_dir in dir_list:
+                if check_calc_done(sub_dir):
+                    calc_info[target_dir][surface][sub_dir] = True
+                else:
+                    calc_info[target_dir][surface][sub_dir] = False
+            os.chdir("../")
+        os.chdir("../")
+        return calc_info
+
+    if dopant is not None:
+        dir_list = make_dir_list()
+        for sub_dir in dir_list:
+            if check_calc_done(sub_dir):
+                calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = True
+            else:
+                calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = False
+    else:
+        dir_list = make_dir_list()
+        for sub_dir in dir_list:
+            if check_calc_done(sub_dir):
+                calc_info[target_dir][sub_dir] = True
+            else:
+                calc_info[target_dir][sub_dir] = False
+    os.chdir("../")
     return calc_info
 
 class Calculation():
@@ -77,7 +96,7 @@ class Calculation():
                 os.chdir(path)
                 
                 #calc_info.jsonを初期化
-                calc_info = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+                calc_info = defaultdict(lambda:defaultdict(lambda: defaultdict(lambda: defaultdict(dict))))
 
                 #calc_info.jsonの更新    
                 update_calc_info("unitcell", calc_info, piseset.unitcell)
@@ -91,8 +110,10 @@ class Calculation():
                             update_calc_info("defect", calc_info, dopant=dopant)
                             os.chdir("../")
 
-                if os.path.isfile("pise_selftrap.yaml"):
+                if piseset.selftrap:
                     update_calc_info("selftrap", calc_info)
+                if piseset.surface:
+                    update_calc_info("surface", calc_info)
 
                 #calc_info.jsonの保存
                 with open("calc_info.json", "w") as f:

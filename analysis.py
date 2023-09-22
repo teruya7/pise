@@ -1,21 +1,28 @@
 import os
 import subprocess
+import string
+import itertools
 from pise_set import PiseSet
 from collections import defaultdict
 import json
 import yaml
 from target import TargetHandler
 from calculation import Calculation
-from pdf2image import convert_from_path
 from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from pymatgen.core.composition import Composition
 from pymatgen.core.periodic_table import Element
-import string
-import itertools
+from pymatgen.core.structure import Structure
+from pymatgen.io.vasp.outputs import Vasprun, Locpot, VolumetricData, Outcar
+
 
 #unstable_errorに対処し、target_vertices.yamlを作成する
 def avoid_unstable_error(flag, target_material, dopant=None):
     while not flag:
+        if not os.path.isfile("unstable_error.txt"):
+            subprocess.run(["touch unstable_error.txt"], shell=True)
         with open("relative_energies.yaml") as file:
             relative_energies = yaml.safe_load(file)
             try:
@@ -95,7 +102,6 @@ def reduced_cpd(dopant):
     with open("target_vertices.yaml", "w") as f:
         yaml.safe_dump(reduced_target_vertices, f, sort_keys=False)
 
-
 def initialize_analysis_info(analysis_target_list):
     if os.path.isfile("analysis_info.json"):
         print("Loading analysis_info.json")
@@ -135,44 +141,179 @@ def get_label_from_chempotdiag(path_chem_pot_diag):
         labels.append(label)
     return labels
 
-def pdf_to_png(pdf_file, img_path, fmt='png', dpi=200):
-    if os.path.isfile(pdf_file):
-        #pdf_file、img_pathをPathにする
-        pdf_path = Path(pdf_file)
-        image_dir = Path(img_path)
-
-        # PDFをImage に変換(pdf2imageの関数)
-        pages = convert_from_path(pdf_path, dpi)
-
-        #名前を整える
-        for i, page in enumerate(pages):
-            file_name = "{}_{:02d}.{}".format(pdf_path.stem,i+1,fmt)
-            image_path = image_dir / file_name
-            page.save(image_path, fmt)
-            before_name = image_path
-            after_name = pdf_path.stem + "." + fmt
-            os.rename(before_name, after_name)
-    else:
-        print(f"No such file: {pdf_file}")
-
 def plot_pdf(file_name, vise_analysis_command):
     if not os.path.isfile(file_name):
         subprocess.run([vise_analysis_command], shell=True)
     else:
         print(f"{file_name} has already existed.")
 
-def change_name_png(former_name, later_name):
+def change_name(former_name, later_name):
     subprocess.run([f"mv {former_name} {later_name}"], shell=True)
-    pdf_to_png(later_name, "./")
 
 def plot_energy_diagram(labels):
     for label in labels:
         subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
-        change_name_png(f"energy_{label}.pdf", f"energy_{label}_default.pdf")
+        change_name(f"energy_{label}.pdf", f"energy_{label}_default.pdf")
+        change_name(f"energy_{label}.png", f"energy_{label}_default.png")
         
         subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
-        change_name_png(f"energy_{label}.pdf", f"energy_{label}_-5_5.pdf")
+        change_name(f"energy_{label}.pdf", f"energy_{label}_-5_5.pdf")
+        change_name(f"energy_{label}.png", f"energy_{label}_-5_5.png")
 
+def calculation_surface_energy(surface_target_info):
+    #bulkの計算結果をを取得
+    bulk_structure = Structure.from_file("../unitcell/opt/POSCAR-finish")
+    bulk_vasprun = Vasprun("../unitcell/opt/vasprun.xml")
+    bulk_totalenergy = bulk_vasprun.final_energy / bulk_structure.num_sites
+    
+    #最初のsurface_energyの比較用
+    min_surface_energy = float("inf")
+
+    for target in surface_target_info:
+        surface_index = target["surface_index"]
+        identifier = target["identifier"]
+        cell_multiplicity = target["cell_multiplicity"]
+        path = surface_index + "/" + identifier
+        
+        #surfaceの計算結果を取得
+        surface_structure = Structure.from_file(f"{path}/POSCAR-finish")
+        surface_vasprun = Vasprun(f"{path}/vasprun.xml")
+        surface_totalenergy = surface_vasprun.final_energy / surface_structure.num_sites
+        surface_area = 2 * np.linalg.norm(np.cross(surface_structure.lattice.matrix[0], surface_structure.lattice.matrix[1]))
+        surface_energy = (surface_totalenergy - bulk_totalenergy) / surface_area
+        
+        surface_energy_dict = defaultdict(dict)
+        surface_energy_dict["surface_index"] = surface_index
+        surface_energy_dict["identifier"] = identifier
+        surface_energy_dict["surface_totalenergy"] = surface_totalenergy
+        surface_energy_dict["surface_area"] = surface_area
+        surface_energy_dict["surface_energy"] = surface_energy
+        surface_energy_dict["surface_energy_min"] = False
+
+        #window（移動平均の幅）を求める
+        outcar = Outcar(f"{path}/OUTCAR-finish")
+        ngfz = outcar.ngf[2]
+        window = int(ngfz) // int(cell_multiplicity)
+        surface_energy_dict["window"] = window
+
+        #surface_energy_info.jsonにデータを保存
+        with open(f"{path}/surface_energy_info.json", "w") as f:
+            json.dump(surface_energy_dict, f, indent=4)
+
+        if surface_energy < min_surface_energy: 
+            path_to_surface_energy_min = path
+
+    #表面エネルギーが最小となる表面を特定する
+    with open(f'{path_to_surface_energy_min}/surface_energy_info.json') as f:
+        surface_energy_info = json.load(f)
+    surface_energy_info["surface_energy_min"] = True
+    with open(f"{path_to_surface_energy_min}/surface_energy_info.json", "w") as f:
+            json.dump(surface_energy_info, f, indent=4)
+
+def plot_averaged_locpot(surface_energy_info):
+    #repeatのファイル名の取得
+    path = Path('./')
+    for repeat in path.glob('repeat-*'):
+        locpot = Locpot.from_file(f"{repeat}/LOCPOT")
+
+    structure = locpot.structure
+    sites = structure.sites
+    window = surface_energy_info["window"] 
+
+    formula = structure.composition.reduced_formula
+    surface_index_formatted = surface_energy_info["surface_index"].replace("_","")
+    target = (f"{formula}({surface_index_formatted})")
+
+    #z軸方向にslabモデルを作成したとする(x=0,y=1,z=2)
+    axis_lable = "z"
+    axis = 2
+    num_grid = locpot.dim[axis]
+    #slabモデルの原子の分率座標が0~1になるように変更する(後で利用しやすいように)
+    coordinates_of_slab_atom = [ site.c if site.c < 0.9 else site.c - 1 for site in sites ]
+
+    #bluk_center_grid番目のgridをbulkの代表点にする
+    bulk_center_coordinate = (max(coordinates_of_slab_atom)+min(coordinates_of_slab_atom)) / 2
+    bluk_center_grid = round(num_grid * bulk_center_coordinate)
+
+    #vacuum_center_grid番目のgridをvaccumeの代表点にする
+    vacuum_center_coordinate = (1+max(coordinates_of_slab_atom)) / 2
+    vacuum_center_grid = round(num_grid * vacuum_center_coordinate)
+
+    ### parse locpot
+    coordinates_of_grid = VolumetricData.get_axis_grid(locpot, axis)
+    potential = VolumetricData.get_average_along_axis(locpot, axis)
+
+    pd.set_option("display.max_rows", None)
+    dim2list = [[coordinates_of_grid[i], potential[i]] for i in range(len(coordinates_of_grid))]
+    df = pd.DataFrame(dim2list, columns=["coordinate", "potential"])
+    df_extended = pd.concat([df, df, df], ignore_index=True)
+    df_extended["rolling"] = df_extended["potential"].rolling(window, center=True).mean()
+    df_extended["re-rolling"] = df_extended["rolling"].rolling(window, center=True).mean()
+
+    df_periodic = df_extended.iloc[range(len(df), len(df) * 2), :]
+    df_periodic.reset_index(drop=True, inplace=True)
+
+    ### write json
+    bulk_like_potential = df_periodic["re-rolling"][bluk_center_grid - 1]
+    vacuum_potential = df_periodic["re-rolling"][vacuum_center_grid - 1]
+    potential_difference = vacuum_potential - bulk_like_potential
+    with open("../../../unitcell/unitcell.yaml") as f:
+        unitcell = yaml.safe_load(f)
+        vbm = unitcell["vbm"] - potential_difference
+        cbm = unitcell["cbm"] - potential_difference
+        band_gap = cbm - vbm
+
+    surface_energy_info["target"] = target
+    surface_energy_info["bulk_like_potential"] = bulk_like_potential
+    surface_energy_info["vacuum_potential"] = vacuum_potential
+    surface_energy_info["potential_difference"] = potential_difference
+    surface_energy_info["vbm"] = vbm
+    surface_energy_info["cbm"] = cbm
+    surface_energy_info["band_gap"] = band_gap
+
+    with open("surface_energy_info.json", "w") as f:
+        json.dump(surface_energy_info, f, indent=4)
+    
+    ### plot potentials
+    plt.rcParams["axes.xmargin"] = 0
+    fig = plt.figure()
+
+    ax = fig.subplots()
+    ax.set_xlabel(fr"Cartesian coordinate in ${axis_lable}$ direction ($\mathrm{{\AA}}$)")
+    ax.set_ylabel("Potential energy (eV)")
+    ax.plot(df["coordinate"], df["potential"], color="k", label="Planar average")
+    ax.plot(df_periodic["coordinate"], df_periodic["rolling"], color="b", label=fr"Macroscopic average ($n$={window})")
+    ax.plot(df_periodic["coordinate"], df_periodic["re-rolling"], color="r", label=fr"Averaged macroscopic average ($m$={window})")
+    
+    ax.legend()
+    ax.plot(df["coordinate"][bluk_center_grid - 1], df_periodic["re-rolling"][bluk_center_grid - 1], 
+            marker="|", color="r", markeredgewidth=1.5, markersize=8)
+    ax.plot(df["coordinate"][vacuum_center_grid - 1], df_periodic["re-rolling"][vacuum_center_grid - 1], 
+            marker="|", color="r", markeredgewidth=1.5, markersize=8)
+
+    plt.title(target)
+    plt.savefig("local_potenrials.pdf")
+    plt.savefig("local_potenrials.png")
+
+    # メモリ解放
+    plt.clf()
+    plt.close()
+
+#---------------------------------------------------------------------------------
+
+def analysis_abs(piseset, calc_info):
+    if os.path.isfile("absorption_coeff.png"):
+        return None
+    
+    if calc_info["unitcell"]["abs"]:
+        os.chdir("unitcell/abs")
+        plot_pdf("absorption_coeff.pdf", piseset.vise_analysis_command_plot_abs)
+        os.chdir("../../")
+    else:
+        print("Calculation of abs has not finished yet.")
+    
+    return None
+        
 def analysis_unitcell(piseset, calc_info, analysis_info):
     #unitcellが解析済みかどうか確認
     if analysis_info["unitcell"]:
@@ -187,42 +328,41 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
         band = "band"
 
     #unitcellの計算が完了しているか確認
-    if calc_info["unitcell"][band] and calc_info["unitcell"]["dielectric"] and calc_info["unitcell"]["abs"]:
-        print("Analyzing unitcell.")
-        os.chdir("unitcell") 
-        if band == "band_nsc":
-            subprocess.run([piseset.vise_analysis_command_unitcell_nsc], shell=True)
-        else:
-            subprocess.run([piseset.vise_analysis_command_unitcell_hybrid], shell=True)
-        flag = check_analysis_done("unitcell.yaml")
+    if not calc_info["unitcell"][band]:
+        print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
+        flag = False
+        return flag
+    
+    if not calc_info["unitcell"]["dielectric"]:
+        print("dielectric calculations have not finished yet. So analysis of unitcell will be skipped.")
+        flag = False
+        return flag
 
+    print("Analyzing unitcell.")
+    os.chdir("unitcell") 
+    if band == "band_nsc":
+        subprocess.run([piseset.vise_analysis_command_unitcell_nsc], shell=True)
+    else:
+        subprocess.run([piseset.vise_analysis_command_unitcell_hybrid], shell=True)
+    flag = check_analysis_done("unitcell.yaml")
+
+    if os.path.isdir(band):
         os.chdir(band)
         plot_pdf("band.pdf", piseset.vise_analysis_command_plot_band)
-        pdf_to_png("band.pdf", "./")
         os.chdir("../")
+    else:
+        flag = False
 
+    if os.path.isdir("dos"):
         os.chdir("dos")
         if not os.path.isfile("effective_mass.json"):
             subprocess.run([piseset.vise_analysis_command_effective_mass], shell=True)
         plot_pdf("dos.pdf", piseset.vise_analysis_command_plot_dos)
-        pdf_to_png("dos.pdf", "./")
         os.chdir("../")
+    else:
+        flag = False
 
-        os.chdir("abs")
-        plot_pdf("absorption_coeff.pdf", piseset.vise_analysis_command_plot_abs)
-        pdf_to_png("absorption_coeff.pdf", "./")
-        os.chdir("../")
-
-        os.chdir("../")
-    elif not calc_info["unitcell"][band]:
-        print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
-        flag = False
-    elif not calc_info["unitcell"]["dielectric"]:
-        print("dielectric calculations have not finished yet. So analysis of unitcell will be skipped.")
-        flag = False
-    elif not calc_info["unitcell"]["abs"]:
-        print("abs calculations have not finished yet. So analysis of unitcell will be skipped.")
-        flag = False
+    os.chdir("../")
 
     return flag
 
@@ -250,13 +390,12 @@ def analysis_cpd(target_material, calc_info, analysis_info):
     if not os.path.isfile("target_vertices.yaml"):
         subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
     flag = check_analysis_done("target_vertices.yaml")
-
+    
     avoid_unstable_error(flag, target_material)
+    flag = check_analysis_done("target_vertices.yaml")
 
     #cpd.pdfを作成し、pngとして保存する
     subprocess.run(["pydefect pc"], shell=True)
-    if os.path.isfile("cpd.pdf"):
-        pdf_to_png("cpd.pdf", "./")
 
     os.chdir("../") 
     return flag
@@ -361,8 +500,6 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
 
     if os.path.isfile("chem_pot_diag.json"):
         subprocess.run(["pydefect pc"], shell=True)
-    if os.path.isfile("cpd.pdf"):
-        pdf_to_png("cpd.pdf", "./")
     os.chdir("../../") 
         
     return flag
@@ -433,183 +570,88 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
 
     return flag
 
-def analysis_defect_plot(calc_info, analysis_info):
-    #defectが解析済みかどうか確認
-    if analysis_info["defect"]:
-        print("Analysis of defect has already finished.")
+def analysis_surface(calc_info, analysis_info):
+    #surfaceが解析済みかどうか確認
+    if analysis_info["surface"]:
         flag = True
+        print("Analysis of surface has already finished.")
         return flag
     
-    #unitcellが解析済みかどうか確認
-    if not analysis_info["unitcell"]:
-        print("Analysis of unitcell has not finished yet. So analysis of defect will be skipped.")
-        flag = False
-        return flag
-    
-    #unitcellが解析済みかどうか確認
-    if not analysis_info["cpd"]:
-        print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
-        flag = False
-        return flag
-
-    #defectの計算が完了しているか確認
-    if not check_calc_alldone(calc_info["defect"].values()):
-        print("defect calculations have not finished yet. So analysis of defect will be skipped.")
-        flag = False
-        return flag
-
-    print("Analyzing defect.")
-    os.chdir("defect") 
-
-    subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
-    subprocess.run(["pydefect des -d *_*/ -u ../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
-    subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
-    
-    labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-    plot_energy_diagram(labels)
-    flag = check_analysis_done("energy_A.pdf")
-
-    os.chdir("../") 
-
-    return flag
-
-def analysis_dopant_defect_plot(dopant, calc_info, analysis_info):
-    #dopantのdefectが解析済みかどうか確認
-    if analysis_info[f"{dopant}_defect"]:
-        print(f"Analysis of {dopant}_defect has already finished.")
-        flag = True
-        return flag
-    
-    #defectが解析済みかどうか確認
-    if not analysis_info["defect"]:
-        print(f"Analysis of defect has not finished yet. So analysis of {dopant}_defect will be skipped.")
-        flag = False
-        return flag
-    
-    #dopantのcpdが解析済みかどうか確認
-    if not analysis_info[f"{dopant}_cpd"]:
-        print(f"Analysis of {dopant}_cpd has not finished yet. So analysis of {dopant}_defect will be skipped.")
-        flag = False
-        return flag
-
-    #dopnatのdefectフォルダがあるか確認
-    if not os.path.isdir(f"dopant_{dopant}/defect"):
-        print(f"No such directory: dopant_{dopant}'s defect")
-        flag = False
-        return flag
-    
-    #dopantのdefectの計算が完了しているか確認
-    if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
-        print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
-        flag = False
-        return flag
-    
-    print(f"Analyzing dopant_{dopant}'s defect.")
-    os.chdir(f"dopant_{dopant}/defect") 
-
-    subprocess.run(["pydefect dei -d *_*/ -pcr perfect/calc_results.json -u ../../unitcell/unitcell.yaml -s ../cpd/standard_energies.yaml"], shell=True)
-    subprocess.run(["pydefect des -d *_*/ -u ../../unitcell/unitcell.yaml -pbes perfect/perfect_band_edge_state.json -t ../cpd/target_vertices.yaml"], shell=True)
-    subprocess.run(["pydefect cs -d *_*/ -pcr perfect/calc_results.json"], shell=True)
+    #surfaceの計算が完了しているか確認
+    for surface in calc_info["surface"].keys():
+        if not check_calc_alldone(calc_info["surface"][surface].values()):
+            print("surface calculations have not finished yet. So analysis of cpd will be skipped.")
+            flag = False
+            return flag
         
-    #化学ポテンシャルの極限の条件のラベルを取得
-    labels = get_label_from_chempotdiag("../cpd/chem_pot_diag.json")
-    plot_energy_diagram(labels)
-    flag = check_analysis_done("energy_A.pdf")
+    print("Analyzing surface.")
+    os.chdir("surface") 
+    with open('surface_target_info.json') as f:
+        surface_target_info = json.load(f)
 
-    os.chdir("../../")
+    calculation_surface_energy(surface_target_info)
 
+    for target in surface_target_info:
+        surface_index = target["surface_index"]
+        identifier = target["identifier"]
+        path = surface_index + "/" + identifier
+
+        os.chdir(path)
+
+        with open('surface_energy_info.json') as f:
+            surface_energy_info = json.load(f)
+        
+        plot_averaged_locpot(surface_energy_info)
+        os.chdir("../../")
+        
+
+
+    flag = False
+    os.chdir("../")
+    
     return flag
 
 class Analysis():
     def __init__(self):
-        self.piseset = PiseSet()
+        piseset = PiseSet()
         #calc_info.jsonの更新
         Calculation()
 
         #analysis_target_listを作成
         analysis_target_list = ["unitcell","cpd", "defect"]
-        if self.piseset.dopants is None:
-            print("No dopant is considered.")
-        else:
-            for dopant in self.piseset.dopants:
+        if piseset.dopants is not None:
+            for dopant in piseset.dopants:
                 analysis_target_list.append(f"{dopant}_cpd")
                 analysis_target_list.append(f"{dopant}_defect")
-        self.analysis_target_list = analysis_target_list
+        analysis_target_list = analysis_target_list
 
-    def analysis(self):
-        for target in self.piseset.target_info:
+        for target in piseset.target_info:
             target_material = TargetHandler(target)
-            path = target_material.make_path(self.piseset.functional)
+            path = target_material.make_path(piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
 
                 #analysis_info.jsonとcalc_info.jsonの読み込み
-                analysis_info = initialize_analysis_info(self.analysis_target_list)
+                analysis_info = initialize_analysis_info(analysis_target_list)
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
 
                 #解析を実行
-                analysis_info["unitcell"] = analysis_unitcell(self.piseset, calc_info, analysis_info)
+                analysis_info["unitcell"] = analysis_unitcell(piseset, calc_info, analysis_info)
                 analysis_info["cpd"] = analysis_cpd(target_material, calc_info, analysis_info)
                 analysis_info["defect"] = analysis_defect(calc_info, analysis_info)
-                if self.piseset.dopants is None:
-                    print("No dopant is considered.")
-                    print()
-                else:
-                    for dopant in self.piseset.dopants:
+
+                if piseset.abs:
+                    analysis_abs(piseset, calc_info)
+                
+                if piseset.surface:
+                    analysis_info.setdefault("surface", False)
+                    analysis_surface(calc_info, analysis_info)
+
+                if piseset.dopants is not None:
+                    for dopant in piseset.dopants:
                         analysis_info[f"{dopant}_cpd"] = analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info)
                         analysis_info[f"{dopant}_defect"] = analysis_dopant_defect(dopant, calc_info, analysis_info)
-                    
-                with open("analysis_info.json", "w") as f:
-                    json.dump(analysis_info, f, indent=4)
-
-                os.chdir("../../")
-            else:
-                print(f"No such directory: {path}")
-    
-    #target_key={unitcell,cpd,defect}で指定したanalysis_info.jsonのkeyのvalueをfalseにする。
-    def false(self, target_key):
-        for target in self.piseset.target_info:
-            target_material = TargetHandler(target)
-            path = target_material.make_path(self.piseset.functional)
-            if os.path.isdir(path):
-                os.chdir(path)
-
-                with open('analysis_info.json') as f:
-                    analysis_info = json.load(f)
-
-                if target_key in analysis_info.keys():
-                    analysis_info[target_key] = False
-                else:
-                    print(f"No such key: {target_key}")
-
-                with open("analysis_info.json", "w") as f:
-                    json.dump(analysis_info, f, indent=4)
-                    
-                os.chdir("../../")
-            else:
-                print(f"No such directory: {path}. So making {path} directory.")
-
-    def plot(self):
-        for target in self.piseset.target_info:
-            target_material = TargetHandler(target)
-            path = target_material.make_path(self.piseset.functional)
-            if os.path.isdir(path):
-                os.chdir(path)
-
-                #analysis_info.jsonとcalc_info.jsonの読み込み
-                analysis_info = initialize_analysis_info(self.analysis_target_list)
-                with open('calc_info.json') as f:
-                    calc_info = json.load(f)
-
-                #解析を実行
-                analysis_info["defect"] = analysis_defect_plot(calc_info, analysis_info)
-                if self.piseset.dopants is None:
-                    print("No dopant is considered.")
-                    print()
-                else:
-                    for dopant in self.piseset.dopants:
-                        analysis_info[f"{dopant}_defect"] = analysis_dopant_defect_plot(dopant, calc_info, analysis_info)
                     
                 with open("analysis_info.json", "w") as f:
                     json.dump(analysis_info, f, indent=4)

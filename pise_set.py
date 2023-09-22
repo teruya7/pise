@@ -15,6 +15,7 @@ class PiseSet():
             self.num_jobs_command = pise_defaults["num_jobs_command"]
             self.job_script_path = pise_defaults["job_script_path"]
             self.submission_ready = pise_defaults["submission_ready"]
+            self.path_to_tsubo = pise_defaults["path_to_tsubo"]
 
             #job_scriptの設定
             self.job_script_small = pise_defaults["job_script_small"]
@@ -32,6 +33,7 @@ class PiseSet():
             self.vise_task_command_dielectric_hybrid = pise_defaults["vise_task_command_dielectric_hybrid"]
             self.vise_task_command_abs = pise_defaults["vise_task_command_abs"]
             self.vise_task_command_defect = pise_defaults["vise_task_command_defect"]
+            self.vise_task_command_surface = pise_defaults["vise_task_command_surface"]
 
             #vise_analysis_command
             self.vise_analysis_command_plot_band = pise_defaults["vise_analysis_command_plot_band"]
@@ -43,18 +45,64 @@ class PiseSet():
 
             self.local_path = pise_defaults["local_path"]
 
+            #surface
+            self.slab_thickness = pise_defaults["slab_thickness"]
+            self.vaccum_thickness = pise_defaults["vaccum_thickness"]
+            self.h = pise_defaults["h"]
+            self.k = pise_defaults["k"]
+            self.l = pise_defaults["l"]
+            self.cap = pise_defaults["cap"]
+
             
         #pise.yamから設定を読み込む
         with open("pise.yaml") as file:
             pise = yaml.safe_load(file)
-            self.dopants = pise["dopants"]
-            self.substitution_site = pise["substitution_site"]
             self.functional = pise["functional"]
-            self.path_to_poscar = pise["path_to_poscar"]
-            if self.functional == "pbesol":
-                self.unitcell = ["opt", "band", "dos", "dielectric", "band_nsc", "dielectric_rpa", "abs"]
+
+            if "dopants" in pise:
+                self.dopants = pise["dopants"]
             else:
-                self.unitcell = ["opt", "band", "dos", "dielectric", "abs"]
+                self.dopants = None
+            
+            if "substitution_site" in pise:
+                self.substitution_site = pise["substitution_site"]
+            else:
+                self.substitution_site = None
+            
+            if "path_to_poscar" in pise:
+                self.path_to_poscar = pise["path_to_poscar"]
+            else:
+                self.path_to_poscar = None
+            
+            if "aexx" in pise:
+                self.aexx = pise["aexx"]
+            else:
+                self.aexx = None
+
+            if "surface" in pise:
+                self.surface = pise["surface"]
+            else:
+                self.surface = False
+            
+            if "selftrap" in pise:
+                self.selftrap = pise["selftrap"]
+            else:
+                self.selftrap = False
+
+            if "abs" in pise:
+                self.abs = pise["abs"]
+            else:
+                self.abs = False
+
+
+            if self.functional == "pbesol":
+                unitcell = ["opt", "band", "dos", "dielectric", "band_nsc", "dielectric_rpa"]
+            else:
+                unitcell = ["opt", "band", "dos", "dielectric"]
+            if self.abs:
+                unitcell.append("abs")
+            
+            self.unitcell = unitcell
 
 
         #target_info.jsonを読み込み
@@ -75,13 +123,38 @@ class PiseSet():
                                 'set_hubbard_u': True
                             }
                             }
-        if self.functional == "hse":
-            vise_yaml["xc"] = "hse"
+        if self.functional != "pbesol":
+            vise_yaml["xc"] = self.functional
             vise_yaml["user_incar_settings"]["ALGO"] = "Normal"
-        elif self.functional == "pbe0":
-            vise_yaml["xc"] = "pbe0"
-            vise_yaml["user_incar_settings"]["ALGO"] = "Normal"
+            if pise["aexx"] is not None:
+                vise_yaml["user_incar_settings"]["AEXX"] = pise["aexx"]
         self.vise_yaml = vise_yaml
+
+        #vise_surface.yamlを作成
+        vise_surface_yaml = {
+                            'outcar': 'OUTCAR-finish',
+                            'contcar': 'POSCAR-finish',
+                            'overridden_potcar': 'Ga',
+                            'xc': 'pbesol',
+                            'user_incar_settings': {
+                                'ENCUT': 400,
+                                'LWAVE': True,
+                                "EDIFF": 1e-07,
+                                "EDIFFG": -0.005,
+                                "ISPIN": 1,
+                                "LVHAR": True,
+                                "LREAL": False
+                            },
+                            'options': {
+                                'set_hubbard_u': True
+                            }
+                            }
+        if self.functional != "pbesol":
+            vise_surface_yaml["xc"] = self.functional
+            vise_surface_yaml["user_incar_settings"]["ALGO"] = "Normal"
+            if pise["aexx"] is not None:
+                vise_surface_yaml["user_incar_settings"]["AEXX"] = pise["aexx"]
+        self.vise_surface_yaml = vise_surface_yaml
 
 
 if __name__ == '__main__':
