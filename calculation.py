@@ -3,6 +3,7 @@ import json
 from collections import defaultdict
 from pise_set import PiseSet
 from target import TargetHandler
+import yaml
 
 #ディレクトリのリストを作成
 def make_dir_list():
@@ -102,8 +103,12 @@ class Calculation():
                 update_calc_info("unitcell", calc_info, piseset.unitcell)
                 update_calc_info("cpd", calc_info)
                 update_calc_info("defect", calc_info)
-                if piseset.dopants is not None:
-                    for dopant in piseset.dopants:
+
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
                             update_calc_info("cpd", calc_info, dopant=dopant)

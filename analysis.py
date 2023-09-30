@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from decimal import Decimal, getcontext, ROUND_HALF_UP
 from pymatgen.core.composition import Composition
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.structure import Structure
@@ -185,6 +186,7 @@ def calculation_surface_energy(surface_target_info):
         surface_energy_dict = defaultdict(dict)
         surface_energy_dict["surface_index"] = surface_index
         surface_energy_dict["identifier"] = identifier
+        surface_energy_dict["path"] = path
         surface_energy_dict["surface_totalenergy"] = surface_totalenergy
         surface_energy_dict["surface_area"] = surface_area
         surface_energy_dict["surface_energy"] = surface_energy
@@ -259,20 +261,17 @@ def plot_averaged_locpot(surface_energy_info):
     potential_difference = vacuum_potential - bulk_like_potential
     with open("../../../unitcell/unitcell.yaml") as f:
         unitcell = yaml.safe_load(f)
-        vbm = unitcell["vbm"] - potential_difference
-        cbm = unitcell["cbm"] - potential_difference
-        band_gap = cbm - vbm
+        vbm_from_vacuum = unitcell["vbm"] - potential_difference
+        cbm_from_vacuum = unitcell["cbm"] - potential_difference
+        band_gap = cbm_from_vacuum - vbm_from_vacuum
 
     surface_energy_info["target"] = target
     surface_energy_info["bulk_like_potential"] = bulk_like_potential
     surface_energy_info["vacuum_potential"] = vacuum_potential
     surface_energy_info["potential_difference"] = potential_difference
-    surface_energy_info["vbm"] = vbm
-    surface_energy_info["cbm"] = cbm
+    surface_energy_info["vbm_from_vacuum"] = vbm_from_vacuum
+    surface_energy_info["cbm_from_vacuum"] = cbm_from_vacuum
     surface_energy_info["band_gap"] = band_gap
-
-    with open("surface_energy_info.json", "w") as f:
-        json.dump(surface_energy_info, f, indent=4)
     
     ### plot potentials
     plt.rcParams["axes.xmargin"] = 0
@@ -298,6 +297,31 @@ def plot_averaged_locpot(surface_energy_info):
     # メモリ解放
     plt.clf()
     plt.close()
+
+def plot_band_alignment(band_alignment_summary_info):
+    c = getcontext()
+    c.prec = 3
+    c.rounding = ROUND_HALF_UP
+
+    plt.rcParams['axes.xmargin'] = 0
+    y_min = -20
+    y_max = 0
+    text_offset = 0.2
+
+    fig = plt.figure()
+    ax = fig.subplots()
+    ax.set_ylabel("Energy relative to vacuum level (eV)")
+    ax.set_xlim([-0.5, len(band_alignment_summary_info)-0.5])
+    ax.set_ylim([y_min, y_max])
+
+    for n, band_alignment_info in enumerate(band_alignment_summary_info):
+        ax.bar(str(n) + "-" + band_alignment_info["target"], band_alignment_info["vbm_from_vacuum"]-y_min, bottom=y_min, color="lightblue", width=0.6)
+        ax.bar(str(n) + "-" + band_alignment_info["target"], y_max-band_alignment_info["cbm_from_vacuum"], bottom=band_alignment_info["cbm_from_vacuum"], color="lightgreen", width=0.6)
+        plt.text(n, band_alignment_info["vbm_from_vacuum"]-text_offset, -Decimal(band_alignment_info["vbm_from_vacuum"]), ha="center", va="top")
+        plt.text(n, band_alignment_info["cbm_from_vacuum"]+text_offset, -Decimal(band_alignment_info["cbm_from_vacuum"]), ha="center", va="bottom")
+
+    plt.savefig("band_alignment.pdf")
+    plt.savefig("band_alignment.png")
 
 #---------------------------------------------------------------------------------
 
@@ -577,6 +601,12 @@ def analysis_surface(calc_info, analysis_info):
         print("Analysis of surface has already finished.")
         return flag
     
+    #unitcellが解析済みかどうか確認
+    if not analysis_info["unitcell"]:
+        print("Analysis of unitcell has not finished yet. So analysis of surface will be skipped.")
+        flag = False
+        return flag
+    
     #surfaceの計算が完了しているか確認
     for surface in calc_info["surface"].keys():
         if not check_calc_alldone(calc_info["surface"][surface].values()):
@@ -591,22 +621,37 @@ def analysis_surface(calc_info, analysis_info):
 
     calculation_surface_energy(surface_target_info)
 
+    band_alignment_summary_info = []
+
     for target in surface_target_info:
-        surface_index = target["surface_index"]
-        identifier = target["identifier"]
-        path = surface_index + "/" + identifier
+        path = target["path"]
 
         os.chdir(path)
 
         with open('surface_energy_info.json') as f:
             surface_energy_info = json.load(f)
-        
+
+        #surface_energy_infoにバンドアラインメントに必要な情報を追加
         plot_averaged_locpot(surface_energy_info)
+
+        band_alignment_dict = defaultdict(dict)
+        band_alignment_dict["target"] = surface_energy_info["target"]
+        band_alignment_dict["vbm_from_vacuum"] = surface_energy_info["vbm_from_vacuum"]
+        band_alignment_dict["cbm_from_vacuum"] = surface_energy_info["cbm_from_vacuum"]
+        band_alignment_summary_info.append(band_alignment_dict)
+
+        with open("surface_energy_info.json", "w") as f:
+            json.dump(surface_energy_info, f, indent=4)
+
         os.chdir("../../")
-        
+    
+    plot_band_alignment(band_alignment_summary_info)
 
+    #band_alignment_summary_info.jsonにデータを保存
+    with open("band_alignment_summary_info.json", "w") as f:
+        json.dump(band_alignment_summary_info, f, indent=4)    
 
-    flag = False
+    flag = check_analysis_done("band_alignment.pdf")
     os.chdir("../")
     
     return flag
@@ -619,11 +664,6 @@ class Analysis():
 
         #analysis_target_listを作成
         analysis_target_list = ["unitcell","cpd", "defect"]
-        if piseset.dopants is not None:
-            for dopant in piseset.dopants:
-                analysis_target_list.append(f"{dopant}_cpd")
-                analysis_target_list.append(f"{dopant}_defect")
-        analysis_target_list = analysis_target_list
 
         for target in piseset.target_info:
             target_material = TargetHandler(target)
@@ -646,11 +686,16 @@ class Analysis():
                 
                 if piseset.surface:
                     analysis_info.setdefault("surface", False)
-                    analysis_surface(calc_info, analysis_info)
+                    analysis_info["surface"] = analysis_surface(calc_info, analysis_info)
 
-                if piseset.dopants is not None:
-                    for dopant in piseset.dopants:
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
+                        analysis_info.setdefault(f"{dopant}_cpd", False)
                         analysis_info[f"{dopant}_cpd"] = analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info)
+                        analysis_info.setdefault(f"{dopant}_defect", False)
                         analysis_info[f"{dopant}_defect"] = analysis_dopant_defect(dopant, calc_info, analysis_info)
                     
                 with open("analysis_info.json", "w") as f:

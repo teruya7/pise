@@ -16,7 +16,7 @@ def make_base_markdown(piseset, summary_info):
 # unitcell
 ![Alt text](unitcell/opt/primitivecell.png)
 
-|  unitcell  |    |
+|  unitcell (primitive)  |    |
 | ---- | ---- |
 |  a  |  {poscar_a}  |
 |  b |  {poscar_b}  |
@@ -31,6 +31,9 @@ def make_base_markdown(piseset, summary_info):
 |  cbm (eV)  |  {cbm}  |
 
 ![Alt text](unitcell/{band}/band.png)
+
+## band_alignment
+![Alt text](surface/band_alignment.png)
 
 ## dielectric
 |  dielectric  |    |
@@ -136,8 +139,11 @@ class Markdown():
                             f.write(f"![Alt text](defect/energy_{label}_-5_5.png)\n")
                             f.write(f"### energy_{label}_default\n")
                             f.write(f"![Alt text](defect/energy_{label}_default.png)\n")
-                        if piseset.dopants is not None:
-                            for dopant in piseset.dopants:
+                        if os.path.isfile("pise_dopants_and_sites.yaml"):
+                            with open("pise_dopants_and_sites.yaml") as file:
+                                pise_dopants_and_sites = yaml.safe_load(file)
+                            for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                                dopant = dopant_and_site[0]
                                 f.write(f"# {dopant}\n")
                                 f.write("## cpd\n")
                                 f.write(f"![Alt text](dopant_{dopant}/cpd/cpd.png)\n")

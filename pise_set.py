@@ -58,16 +58,6 @@ class PiseSet():
         with open("pise.yaml") as file:
             pise = yaml.safe_load(file)
             self.functional = pise["functional"]
-
-            if "dopants" in pise:
-                self.dopants = pise["dopants"]
-            else:
-                self.dopants = None
-            
-            if "substitution_site" in pise:
-                self.substitution_site = pise["substitution_site"]
-            else:
-                self.substitution_site = None
             
             if "path_to_poscar" in pise:
                 self.path_to_poscar = pise["path_to_poscar"]
@@ -117,7 +107,8 @@ class PiseSet():
                             'overridden_potcar': 'Ga',
                             'xc': 'pbesol',
                             'user_incar_settings': {
-                                'ENCUT': 400
+                                'ENCUT': 400,
+                                "LWAVE": True
                             },
                             'options': {
                                 'set_hubbard_u': True

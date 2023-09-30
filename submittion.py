@@ -3,6 +3,7 @@ import subprocess
 from calculation import make_dir_list
 from pise_set import PiseSet
 from target import TargetHandler
+import yaml
 
 def submit_jobs(piseset, target_dir):
     if os.path.isdir(target_dir):
@@ -66,8 +67,11 @@ class Submittion():
                         submit_jobs(self.piseset, surface)
                     os.chdir("../")
 
-                if self.piseset.dopants is not None:
-                    for dopant in self.piseset.dopants:
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
                             submit_jobs(self.piseset, "cpd")
@@ -104,8 +108,11 @@ class Submittion():
 
                 submit_jobs(self.piseset, "cpd")
 
-                if self.piseset.dopants is not None:
-                    for dopant in self.piseset.dopants:
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
                             submit_jobs(self.piseset, "cpd")
@@ -127,8 +134,11 @@ class Submittion():
 
                 submit_jobs(self.piseset, "defect")
 
-                if self.piseset.dopants is not None:
-                    for dopant in self.piseset.dopants:
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
                             submit_jobs(self.piseset, "defect")

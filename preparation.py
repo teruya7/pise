@@ -294,7 +294,7 @@ def preparation_dopant_cpd(piseset, preparation_info, elements, dopant):
 
     return flag
 
-def preparation_dopant_defect(piseset, preparation_info, dopant):
+def preparation_dopant_defect(piseset, preparation_info, dopant, site):
     if preparation_info[f"{dopant}_defect"]:
         print(f"Preparation of {dopant}_defect has already finished.")
         flag = True
@@ -313,7 +313,13 @@ def preparation_dopant_defect(piseset, preparation_info, dopant):
         os.chdir("defect")
 
         subprocess.run(["cp ../../defect/supercell_info.json ./"], shell=True)
-        subprocess.run([f"pydefect ds -d {dopant} -k {dopant}_i {dopant}_{piseset.substitution_site}"], shell=True)
+        
+        #dopantがHの時はpydefectでHの格子間のPOSCARを作成しない
+        if dopant == "H":
+            subprocess.run([f"pydefect ds -d {dopant} -k {dopant}_{site}"], shell=True)
+        else:
+            subprocess.run([f"pydefect ds -d {dopant} -k {dopant}_i {dopant}_{site}"], shell=True)
+
         subprocess.run(["pydefect_vasp de"], shell=True)
         subprocess.run(["rm -r perfect"], shell=True)
 
@@ -327,6 +333,7 @@ def preparation_dopant_defect(piseset, preparation_info, dopant):
 
     return flag
 
+#selftrapの検討は未完成
 def preparation_selftrap(piseset, preparation_info):
     if not preparation_info["defect"]:
         print("Preparation of defect has not finished yet.")
@@ -402,6 +409,7 @@ def preparation_surface(piseset, calc_info, preparation_info):
             surface_dict["surface_index"] = surface_index
             surface_dict["identifier"] = identifier
             surface_dict["cell_multiplicity"] = cell_multiplicity
+            surface_dict["path"] = surface_index + "/" + identifier
             surface_target_info.append(surface_dict)
     
     for target in surface_target_info:
@@ -438,13 +446,6 @@ class Preparation():
         else:
             preparation_target_list = ["unitcell","cpd", "defect", "band_nsc"]
 
-        if piseset.dopants is not None:
-            for dopant in piseset.dopants:
-                preparation_target_list.append(f"{dopant}_cpd")
-                preparation_target_list.append(f"{dopant}_defect")
-                if dopant == "H":
-                    preparation_target_list.append("dos_accurate")
-
         for target in piseset.target_info:
             target_material = TargetHandler(target)
             path = target_material.make_path(piseset.functional)
@@ -465,10 +466,16 @@ class Preparation():
                 if piseset.functional == "pbesol":
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
 
-                    if piseset.dopants is not None:
-                        for dopant in piseset.dopants:
-                            preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
-                            preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant)
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
+                        site = dopant_and_site[1]
+                        preparation_info.setdefault(f"{dopant}_cpd", False)
+                        preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
+                        preparation_info.setdefault(f"{dopant}_defect", False)
+                        preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant, site)
                 
                 if piseset.selftrap:
                     preparation_info.setdefault("selftrap", False)

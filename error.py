@@ -4,6 +4,7 @@ from collections import defaultdict
 from pise_set import PiseSet
 from target import TargetHandler
 from calculation import check_calc_done, make_dir_list
+import yaml
 
 def print_error_path(target_dir, error_info, cwd, dopant=None):
     if dopant is None:
@@ -58,15 +59,18 @@ class Error():
                 update_error_info("unitcell", error_info, self.piseset.unitcell)
                 update_error_info("cpd", error_info)
                 update_error_info("defect", error_info)
-                if self.piseset.dopants is not None:
-                    for dopant in self.piseset.dopants:
+
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
                             update_error_info("cpd", error_info, dopant=dopant)
                             update_error_info("defect", error_info, dopant=dopant)
                             os.chdir("../")
-                if os.path.isfile("pise_selftrap.yaml"):
-                    update_error_info("selftrap", error_info)
+
                 
                 #error_info.jsonの絶対パスの表示
                 cwd = os.getcwd()
@@ -74,12 +78,14 @@ class Error():
                     print_error_path("unitcell", error_info, cwd)
                     print_error_path("cpd", error_info, cwd)
                     print_error_path("defect", error_info, cwd)
-                if self.piseset.dopants is not None:
-                    for dopant in self.piseset.dopants:
+                    
+                if os.path.isfile("pise_dopants_and_sites.yaml"):
+                    with open("pise_dopants_and_sites.yaml") as file:
+                        pise_dopants_and_sites = yaml.safe_load(file)
+                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                        dopant = dopant_and_site[0]
                         print_error_path("cpd", error_info, cwd, dopant)
                         print_error_path("defect", error_info, cwd, dopant)
-                if os.path.isfile("pise_selftrap.yaml"):
-                    print_error_path("selftrap", error_info, cwd)
 
                 #error_info.jsonの保存
                 with open("error_info.json", "w") as f:

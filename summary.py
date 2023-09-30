@@ -89,8 +89,11 @@ class Summury():
 
                         #競合相のラベルの取得
                         summary_info["labels"] = get_label_from_chempotdiag("cpd/chem_pot_diag.json")
-                        if piseset.dopants is not None:
-                            for dopant in piseset.dopants:
+                        if os.path.isfile("pise_dopants_and_sites.yaml"):
+                            with open("pise_dopants_and_sites.yaml") as file:
+                                pise_dopants_and_sites = yaml.safe_load(file)
+                            for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+                                dopant = dopant_and_site[0]
                                 summary_info[dopant]["labels"] = get_label_from_chempotdiag(f"dopant_{dopant}/cpd/chem_pot_diag.json")
                             
 

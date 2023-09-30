@@ -7,6 +7,7 @@ from visualization import Visualization
 from summary import Summury
 from markdown import Markdown
 from error import Error
+from doping import Doping
 
 Fire({
     "tar": Target, 
@@ -16,5 +17,6 @@ Fire({
     "vis": Visualization,
     "sum": Summury,
     "submit": Submittion,
-    "md": Markdown
+    "md": Markdown,
+    "dope": Doping
     })
