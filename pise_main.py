@@ -2,7 +2,7 @@ from fire import Fire
 from target import Target
 from preparation import Preparation
 from analysis import Analysis
-from submittion import Submittion
+from submission import Submission
 from visualization import Visualization
 from summary import Summury
 from markdown import Markdown
