@@ -3,6 +3,14 @@ from target import TargetHandler
 import os
 import yaml
 
+def get_dopants_list():
+    dopants = []
+    with open("pise_dopants_and_sites.yaml") as file:
+        pise_dopants_and_sites = yaml.safe_load(file)
+    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
+        dopants.append(dopant_and_site[0])
+    return dopants
+
 class Doping():
     def __init__(self):
         pass

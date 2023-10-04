@@ -3,6 +3,7 @@ import os
 from pise_set import PiseSet
 from target import TargetHandler
 from collections import defaultdict
+from doping import get_dopants_list
 
 
 def make_base_markdown(piseset, summary_info):
@@ -139,11 +140,10 @@ class Markdown():
                             f.write(f"![Alt text](defect/energy_{label}_-5_5.png)\n")
                             f.write(f"### energy_{label}_default\n")
                             f.write(f"![Alt text](defect/energy_{label}_default.png)\n")
+
                         if os.path.isfile("pise_dopants_and_sites.yaml"):
-                            with open("pise_dopants_and_sites.yaml") as file:
-                                pise_dopants_and_sites = yaml.safe_load(file)
-                            for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
-                                dopant = dopant_and_site[0]
+                            dopants = get_dopants_list()
+                            for dopant in dopants:
                                 f.write(f"# {dopant}\n")
                                 f.write("## cpd\n")
                                 f.write(f"![Alt text](dopant_{dopant}/cpd/cpd.png)\n")

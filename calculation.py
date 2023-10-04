@@ -3,7 +3,10 @@ import json
 from collections import defaultdict
 from pise_set import PiseSet
 from target import TargetHandler
-import yaml
+from doping import get_dopants_list
+from pymatgen.io.vasp.outputs import Vasprun
+import pathlib
+import xml
 
 #ディレクトリのリストを作成
 def make_dir_list():
@@ -14,44 +17,38 @@ def make_dir_list():
                 list.append(f)
     return list
 
-#計算が終わったかどうかを確認
-def check_calc_done(path):
-    try:
-        os.chdir(path)
-        if os.path.isfile("vasprun.xml"):
-            flag_1 = True
-        else:
-            flag_1 = False
-
-        if os.path.isfile("OUTCAR-finish") or os.path.isfile("OUTCAR"):    
-            flag_2 = True
-        else:
-            flag_2 = False
-
-        if flag_1 and flag_2:
+def is_calc_converged(path):
+    os.chdir(path)
+    if path == "band_nsc" and os.path.isfile("vasprun.xml"):
+        os.chdir("../")
+        return True
+    if os.path.isfile("is_converged.txt"):
+        os.chdir("../")
+        return True
+    if os.path.isfile("vasprun.xml"):
+        try:
+            vasprun = Vasprun("vasprun.xml")
+            if vasprun.converged:
+                touch = pathlib.Path("is_converged.txt")
+                touch.touch()
+                os.chdir("../")
+                return True
+        except xml.etree.ElementTree.ParseError:
             os.chdir("../")
-            return True
+            return False
         else:
             os.chdir("../")
             return False
-    except FileNotFoundError:
+    else:
+        os.chdir("../")
         return False
 
 #target_dirのsub_dirの計算が終わったかの情報をcalc_infoに記録
-def update_calc_info(target_dir, calc_info, unitcell_list=None, dopant=None):
+def update_calc_info(target_dir, calc_info, dopant=None):
     if not os.path.isdir(target_dir):
         return calc_info
     
     os.chdir(target_dir)
-
-    if target_dir == "unitcell": 
-        for unitcell_dir in unitcell_list:
-            if check_calc_done(unitcell_dir):
-                calc_info[target_dir][unitcell_dir] = True
-            else:
-                calc_info[target_dir][unitcell_dir] = False
-        os.chdir("../")
-        return calc_info
 
     if target_dir == "surface":   
         surface_list = make_dir_list()
@@ -59,7 +56,7 @@ def update_calc_info(target_dir, calc_info, unitcell_list=None, dopant=None):
             os.chdir(surface)
             dir_list = make_dir_list()
             for sub_dir in dir_list:
-                if check_calc_done(sub_dir):
+                if is_calc_converged(sub_dir):
                     calc_info[target_dir][surface][sub_dir] = True
                 else:
                     calc_info[target_dir][surface][sub_dir] = False
@@ -70,19 +67,31 @@ def update_calc_info(target_dir, calc_info, unitcell_list=None, dopant=None):
     if dopant is not None:
         dir_list = make_dir_list()
         for sub_dir in dir_list:
-            if check_calc_done(sub_dir):
+            if is_calc_converged(sub_dir):
                 calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = True
             else:
                 calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = False
     else:
         dir_list = make_dir_list()
         for sub_dir in dir_list:
-            if check_calc_done(sub_dir):
+            if is_calc_converged(sub_dir):
                 calc_info[target_dir][sub_dir] = True
             else:
                 calc_info[target_dir][sub_dir] = False
     os.chdir("../")
     return calc_info
+
+def print_unfinished_path(calc_info, cwd):
+    print("Unfinished_calculations:")
+    for layer_1 in calc_info.keys():
+        for layer_2 in calc_info[layer_1].keys():
+            if calc_info[layer_1][layer_2] == True or calc_info[layer_1][layer_2] == False:
+                if not calc_info[layer_1][layer_2]:
+                    print(f"{cwd}/{layer_1}/{layer_2}")
+            else:
+                for layer_3 in calc_info[layer_1][layer_2].keys():
+                    if not calc_info[layer_1][layer_2][layer_3]:
+                        print(f"{cwd}/{layer_1}/{layer_2}/{layer_3}")
 
 class Calculation():
     def __init__(self):
@@ -100,25 +109,24 @@ class Calculation():
                 calc_info = defaultdict(lambda:defaultdict(lambda: defaultdict(lambda: defaultdict(dict))))
 
                 #calc_info.jsonの更新    
-                update_calc_info("unitcell", calc_info, piseset.unitcell)
+                update_calc_info("unitcell", calc_info)
                 update_calc_info("cpd", calc_info)
                 update_calc_info("defect", calc_info)
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
-                    with open("pise_dopants_and_sites.yaml") as file:
-                        pise_dopants_and_sites = yaml.safe_load(file)
-                    for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
-                        dopant = dopant_and_site[0]
+                    dopants = get_dopants_list()
+                    for dopant in dopants:
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
                             update_calc_info("cpd", calc_info, dopant=dopant)
                             update_calc_info("defect", calc_info, dopant=dopant)
                             os.chdir("../")
 
-                if piseset.selftrap:
-                    update_calc_info("selftrap", calc_info)
                 if piseset.surface:
                     update_calc_info("surface", calc_info)
+
+                cwd = os.getcwd()
+                print_unfinished_path(calc_info, cwd)
 
                 #calc_info.jsonの保存
                 with open("calc_info.json", "w") as f:
@@ -130,4 +138,4 @@ class Calculation():
                 print(f"No such directory: {path}")
         
 if __name__ == '__main__':
-    print()
+    Calculation()

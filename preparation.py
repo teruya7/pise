@@ -1,6 +1,7 @@
 from target import TargetHandler
 from calculation import Calculation, make_dir_list
 from pise_set import PiseSet
+from cpd import delete_duplication
 import os
 from collections import defaultdict
 import json
@@ -19,22 +20,6 @@ def make_file_list():
                 list.append(f)
     return list
 
-def delete_duplication(path_to_criteria, path_to_target):
-    #元のパスの記録
-    cwd = os.getcwd()
-    os.chdir(path_to_criteria)
-    criteria_list = make_dir_list()
-
-    os.chdir(cwd)
-    os.chdir(path_to_target)
-    target_list = make_dir_list()
-
-    for i in target_list:
-        if i in criteria_list:
-            subprocess.run([f"rm -r {i}"], shell=True)
-            print(f"{i} is duplication. So {i} has deleted.")
-    os.chdir(cwd)
-
 def calc_aexx(vasprun_path):
     vasprun = Vasprun(vasprun_path)
     epsilon_electronic = vasprun.epsilon_static
@@ -42,73 +27,73 @@ def calc_aexx(vasprun_path):
     AEXX_formatted = '{:.2g}'.format(AEXX)
     return AEXX_formatted
 
-def initialize_preparetion_info(preparation_target_list):
+def load_preparetion_info():
     if os.path.isfile("preparation_info.json"):
         print("Loading preparation_info.json")
         with open('preparation_info.json') as f:
             preparation_info = json.load(f)
-        for i in preparation_target_list:
-            preparation_info.setdefault(i, False)
     else:
         preparation_info = defaultdict(dict)
         print("Making preparation_info.json")
-        for i in preparation_target_list:
-                preparation_info[i] = False
     return preparation_info
 
-def check_preparation_done():
+def check_viseset_done():
     if os.path.isfile("POTCAR"):
         return True
     else:
         return False
- 
-def prepare_job_script(piseset, task_name):
-    cwd = os.getcwd()
-    if task_name in piseset.small_task:
-        shutil.copy(f"{piseset.job_script_path}/{piseset.job_script_small}", cwd)
-        touch = pathlib.Path(piseset.submission_ready)
-        touch.touch()
-    elif task_name in piseset.large_task:
-        shutil.copy(f"{piseset.job_script_path}/{piseset.job_script_large}", cwd)
-        touch = pathlib.Path(piseset.submission_ready)
-        touch.touch()
-    else:
-        print("A job script used for the task is not defined.")
 
-def prepare_input_files(piseset, target_dir, vise_task_command, task_name):
-    if not os.path.isdir(task_name):
+def prepare_job_script(job_script_path, job_script):
+    cwd = os.getcwd()
+    shutil.copy(f"{job_script_path}/{job_script}", cwd)
+    touch = pathlib.Path("ready_for_submission.txt")
+    touch.touch()
+
+def prepare_vasp_inputs(target_dir, vise_task_command, job_script_path, job_script):
+    if not os.path.isdir(target_dir):
         print(f"Preparing {target_dir}.")
         os.makedirs(target_dir, exist_ok=True)
         os.chdir(target_dir)
-        if not check_preparation_done():
-            prepare_job_script(piseset, task_name)
+        if not check_viseset_done():
+            prepare_job_script(job_script_path, job_script)
             subprocess.run([vise_task_command], shell=True)
         os.chdir("../")
     else:
-        print(f"{task_name} has already prepared.")
+        print(f"{target_dir} has already prepared.")
 
 #---------------------------------------------------------
 def preparation_opt(piseset, material_id, formula_pretty):
     print("Preparing opt.")
-    if not os.path.isdir(f"{formula_pretty}_{material_id}/{piseset.functional}/unitcell/opt"):
-        os.makedirs(f"{formula_pretty}_{material_id}/{piseset.functional}/unitcell/opt", exist_ok=True)
-        os.chdir(f"{formula_pretty}_{material_id}/{piseset.functional}")
+    functional = piseset.functional
+    if not os.path.isdir(f"{formula_pretty}_{material_id}/{functional}/unitcell/opt"):
+        os.makedirs(f"{formula_pretty}_{material_id}/{functional}/unitcell/opt", exist_ok=True)
+        os.chdir(f"{formula_pretty}_{material_id}/{functional}")
 
         #vise.yamlの作成
+        vise_yaml = piseset.vise_yaml
+        vise_yaml["xc"] = functional
+        if piseset.is_hybrid[functional]:
+            vise_yaml["user_incar_settings"].setdefault("AEXX", piseset.aexx)
         with open("vise.yaml", "w") as f:
-            yaml.dump(piseset.vise_yaml, f, sort_keys=False)
+            yaml.dump(vise_yaml, f, sort_keys=False)
 
         os.chdir("unitcell/opt")
         if material_id != "None":
-            if not check_preparation_done():
+            if not check_viseset_done():
                 subprocess.run([f"vise gp -m {material_id}"], shell=True)
-                prepare_job_script(piseset, "opt")
+                if piseset.is_hybrid[functional]:
+                    prepare_job_script(piseset.job_script_path, piseset.job_table["opt_hybrid"])
+                else:
+                    prepare_job_script(piseset.job_script_path, piseset.job_table["opt"])
                 subprocess.run([piseset.vise_task_command_opt], shell=True)
         else:
             cwd = os.getcwd()
-            if not check_preparation_done():
+            if not check_viseset_done():
                 shutil.copy(f"{piseset.path_to_poscar}/{formula_pretty}_POSCAR", f"{cwd}/POSCAR")
-                prepare_job_script(piseset, "opt")
+                if piseset.is_hybrid[functional]:
+                    prepare_job_script(piseset.job_script_path, piseset.job_table["opt_hybrid"])
+                else:
+                    prepare_job_script(piseset.job_script_path, piseset.job_table["opt"])
                 subprocess.run([piseset.vise_task_command_opt], shell=True)
             
 def preparation_unitcell(piseset, calc_info, preparation_info):
@@ -126,21 +111,25 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
     
     print("Preparing unitcell.")
     os.chdir("unitcell")
-    prepare_input_files(piseset, "band", piseset.vise_task_command_band, "band")
-    prepare_input_files(piseset, "dos", piseset.vise_task_command_dos, "dos")
 
-    #格子間Hの配置の候補を考えるために精度の高い計算でCHGCAR, LOCPOT, ELFCARの出力する
-    if piseset.dopants is not None:
-        if "H" in piseset.dopants:
-            prepare_input_files(piseset, "dos_accurate", piseset.vise_task_command_dos_accurate, "dos")
-
-    prepare_input_files(piseset, "abs", piseset.vise_task_command_abs, "abs")
-
-    if piseset.functional == "pbesol": 
-        prepare_input_files(piseset, "dielectric", piseset.vise_task_command_dielectric, "dielectric")
-        prepare_input_files(piseset, "dielectric_rpa", piseset.vise_task_command_dielectric_rpa, "dielectric_rpa")
+    if piseset.is_hybrid[piseset.functional]:
+        prepare_vasp_inputs("band", piseset.vise_task_command_band, piseset.job_script_path, piseset.job_table["band_hybrid"])
+        prepare_vasp_inputs("dos", piseset.vise_task_command_dos, piseset.job_script_path, piseset.job_table["dos_hybrid"])
+        prepare_vasp_inputs("dielectric", piseset.vise_task_command_dielectric_hybrid, piseset.job_script_path, piseset.job_table["dielectric_hybrid"])
     else:
-        prepare_input_files(piseset, "dielectric", piseset.vise_task_command_dielectric_hybrid, "dielectric")
+        prepare_vasp_inputs("band", piseset.vise_task_command_band, piseset.job_script_path, piseset.job_table["band"])
+        prepare_vasp_inputs("dos", piseset.vise_task_command_dos, piseset.job_script_path, piseset.job_table["dos"])
+        prepare_vasp_inputs("dielectric", piseset.vise_task_command_dielectric, piseset.job_script_path, piseset.job_table["dielectric"])
+
+    #光吸収係数の計算は欠陥計算には関係ないので計算するかどうかは任意
+    if piseset.abs:
+        if piseset.is_hybrid[piseset.functional]:
+            prepare_vasp_inputs("abs", piseset.vise_task_command_abs, piseset.job_script_path, piseset.job_table["abs_hybrid"])
+        else:
+            prepare_vasp_inputs("abs", piseset.vise_task_command_abs, piseset.job_script_path, piseset.job_table["abs"])
+
+    if piseset.nsc: 
+        prepare_vasp_inputs("dielectric_rpa", piseset.vise_task_command_dielectric_rpa, piseset.job_script_path, piseset.job_table["dielectric_rpa"])
     
     os.chdir("../")
     flag = True
@@ -153,11 +142,13 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
         flag = True
         return flag
     
+    calc_info["unitcell"].setdefault("band", False)
     if not calc_info["unitcell"]["band"]:
         print("Caluculation of band has not finished yet. So preparing band_nsc will be skipped.")
         flag = False
         return flag
     
+    calc_info["unitcell"].setdefault("dielectric_rpa", False)
     if not calc_info["unitcell"]["dielectric_rpa"]:
         print("Caluculation of dielectric_rpa has not finished yet. So preparing band_nsc will be skipped.")
         flag = False
@@ -180,7 +171,7 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
         vise_yaml["options"]["set_hubbard_u"] = False
         yaml.dump(vise_yaml, f, sort_keys=False)
 
-    if not check_preparation_done():
+    if not check_viseset_done():
         prepare_job_script(piseset, "band_nsc")
         subprocess.run([f"{piseset.vise_task_command_band_nsc} {aexx}"], shell=True)
         subprocess.run(["cp ../band/WAVECAR ./"], shell=True)
@@ -216,7 +207,10 @@ def preparation_cpd(piseset, preparation_info, elements):
     #計算インプットの作成
     cpd_dir_list = make_dir_list()
     for target_dir in cpd_dir_list:
-        prepare_input_files(piseset, target_dir, piseset.vise_task_command_opt, "opt")
+        if piseset.is_hybrid[piseset.functional]:
+            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+        else:
+            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
     
     os.chdir("../")
     flag = True
@@ -229,6 +223,7 @@ def preparation_defect(piseset, calc_info, preparation_info):
         flag = True
         return flag
     
+    calc_info["unitcell"].setdefault("dos", False)
     if not calc_info["unitcell"]["dos"]:
         print("dos calculations have not finished yet. So preparing defect will be skipped.")
         flag = False
@@ -248,7 +243,10 @@ def preparation_defect(piseset, calc_info, preparation_info):
         #計算インプットの作成
         defect_dir_list = make_dir_list()
         for target_dir in defect_dir_list:
-            prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
+            if piseset.is_hybrid[piseset.functional]:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"])
+            else:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
         
         os.chdir("../")
         flag = True
@@ -287,7 +285,10 @@ def preparation_dopant_cpd(piseset, preparation_info, elements, dopant):
     #計算インプットの作成
     cpd_dir_list = make_dir_list()
     for target_dir in cpd_dir_list:
-        prepare_input_files(piseset, target_dir, piseset.vise_task_command_opt, "opt")
+        if piseset.is_hybrid[piseset.functional]:
+            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+        else:
+            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
     
     os.chdir("../../")
     flag = True
@@ -326,47 +327,14 @@ def preparation_dopant_defect(piseset, preparation_info, dopant, site):
         #計算インプットの作成
         defect_dir_list = make_dir_list()
         for target_dir in defect_dir_list:
-            prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
+            if piseset.is_hybrid[piseset.functional]:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"])
+            else:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
         
         os.chdir("../../")
         flag = True
 
-    return flag
-
-#selftrapの検討は未完成
-def preparation_selftrap(piseset, preparation_info):
-    if not preparation_info["defect"]:
-        print("Preparation of defect has not finished yet.")
-        flag = False
-        return flag
-
-    if preparation_info["selftrap"]:
-        print(f"Preparation of selftrap has already finished.")
-        flag = True
-        return flag
-    
-    print("Preparing selftrap.")
-    os.makedirs("selftrap", exist_ok=True)
-    os.chdir("selftrap")
-
-    subprocess.run(["cp ../defect/supercell_info.json ./"], shell=True)
-    with open('supercell_info.json') as f:
-        supercell_info = json.load(f)
-
-    with open("defect_in.yaml", mode='w') as f:
-        for site in supercell_info["sites"].keys():
-            f.write(f"{site[:-1]}_{site}: [-2, -1, 1, 2]\n")
-
-    subprocess.run(["pydefect_vasp de"], shell=True)
-    subprocess.run(["rm -r perfect"], shell=True)
-        
-    #計算インプットの作成
-    defect_dir_list = make_dir_list()
-    for target_dir in defect_dir_list:
-        prepare_input_files(piseset, target_dir, piseset.vise_task_command_defect, "defect")
-    os.chdir("../")
-    flag = True
-        
     return flag
 
 def preparation_surface(piseset, calc_info, preparation_info):
@@ -385,8 +353,13 @@ def preparation_surface(piseset, calc_info, preparation_info):
     os.chdir("surface")
 
     #vise_surface_yamlの作成
+    functional = piseset.functional
+    vise_surface_yaml = piseset.vise_surface_yaml
+    vise_surface_yaml["xc"] = functional
+    if piseset.is_hybrid[functional]:
+        vise_surface_yaml["user_incar_settings"].setdefault("AEXX", piseset.aexx)
     with open("vise.yaml", "w") as f:
-        yaml.dump(piseset.vise_surface_yaml, f, sort_keys=False)
+        yaml.dump(vise_surface_yaml, f, sort_keys=False)
     
     subprocess.run(["cp ../unitcell/opt/POSCAR-finish POSCAR"], shell=True)
     subprocess.run([f"perl {piseset.path_to_tsubo} --unique_nonpolar {piseset.h} {piseset.k} {piseset.l} {piseset.cap} < POSCAR >| tempfile1"], shell=True)
@@ -418,7 +391,10 @@ def preparation_surface(piseset, calc_info, preparation_info):
         os.chdir(surface_index)
         os.makedirs(identifier, exist_ok=True)
         subprocess.run([f"cp POSCAR.{identifier} {identifier}/POSCAR"], shell=True)
-        prepare_input_files(piseset, identifier, piseset.vise_task_command_surface, "surface")
+        if piseset.is_hybrid[piseset.functional]:
+            prepare_vasp_inputs(target, piseset.vise_task_command_surface, piseset.job_script_path, piseset.job_table["surface_hybrid"])
+        else:
+            prepare_vasp_inputs(target, piseset.vise_task_command_surface, piseset.job_script_path, piseset.job_table["surface"])
         os.chdir("../")
 
     #surface_info.jsonにデータを保存
@@ -440,30 +416,27 @@ class Preparation():
         #calc_info.jsonの更新
         Calculation()
 
-        #preparation_target_listを作成
-        if piseset.functional == "pbesol":
-            preparation_target_list = ["unitcell","cpd", "defect"]
-        else:
-            preparation_target_list = ["unitcell","cpd", "defect", "band_nsc"]
-
         for target in piseset.target_info:
             target_material = TargetHandler(target)
             path = target_material.make_path(piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
 
-                #ファイルの読み込み
-                preparation_info = initialize_preparetion_info(preparation_target_list)
+                preparation_info = load_preparetion_info()
+
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
                 
-
-                #インプットファイルの準備
+                preparation_info.setdefault("unitcell", False)
                 preparation_info["unitcell"] = preparation_unitcell(piseset, calc_info, preparation_info)
+
+                preparation_info.setdefault("cpd", False)
                 preparation_info["cpd"] = preparation_cpd(piseset, preparation_info, target_material.elements)
+
+                preparation_info.setdefault("defect", False)
                 preparation_info["defect"] = preparation_defect(piseset, calc_info, preparation_info)
 
-                if piseset.functional == "pbesol":
+                if piseset.nsc:
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
@@ -472,14 +445,12 @@ class Preparation():
                     for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
                         dopant = dopant_and_site[0]
                         site = dopant_and_site[1]
+
                         preparation_info.setdefault(f"{dopant}_cpd", False)
                         preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
+                        
                         preparation_info.setdefault(f"{dopant}_defect", False)
                         preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant, site)
-                
-                if piseset.selftrap:
-                    preparation_info.setdefault("selftrap", False)
-                    preparation_info["selftrap"] = preparation_selftrap(piseset, preparation_info)
                 
                 if piseset.surface:
                     preparation_info.setdefault("surface", False)

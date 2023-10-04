@@ -16,7 +16,7 @@ Fire({
     "ana": Analysis, 
     "vis": Visualization,
     "sum": Summury,
-    "submit": Submittion,
+    "submit": Submission,
     "md": Markdown,
     "dope": Doping
     })

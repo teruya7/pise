@@ -14,7 +14,6 @@ class PiseSet():
             self.submit_command = pise_defaults["submit_command"]
             self.num_jobs_command = pise_defaults["num_jobs_command"]
             self.job_script_path = pise_defaults["job_script_path"]
-            self.submission_ready = pise_defaults["submission_ready"]
             self.path_to_tsubo = pise_defaults["path_to_tsubo"]
 
             #job_scriptの設定
@@ -22,6 +21,15 @@ class PiseSet():
             self.small_task = pise_defaults["small_task"]
             self.job_script_large = pise_defaults["job_script_large"]
             self.large_task = pise_defaults["large_task"]
+
+            self.job_table = pise_defaults["job_table"]
+
+            #vise.yamlの設定
+            self.vise_yaml = pise_defaults["vise_yaml"]
+            self.vise_surface_yaml = pise_defaults["vise_surface_yaml"]
+
+            #汎関数がhybrid汎関数か否かの判定
+            self.is_hybrid = pise_defaults["is_hybrid"]
 
             #vise_task_command
             self.vise_task_command_opt = pise_defaults["vise_task_command_opt"]
@@ -58,95 +66,16 @@ class PiseSet():
         with open("pise.yaml") as file:
             pise = yaml.safe_load(file)
             self.functional = pise["functional"]
-            
-            if "path_to_poscar" in pise:
-                self.path_to_poscar = pise["path_to_poscar"]
-            else:
-                self.path_to_poscar = None
-            
-            if "aexx" in pise:
-                self.aexx = pise["aexx"]
-            else:
-                self.aexx = None
-
-            if "surface" in pise:
-                self.surface = pise["surface"]
-            else:
-                self.surface = False
-            
-            if "selftrap" in pise:
-                self.selftrap = pise["selftrap"]
-            else:
-                self.selftrap = False
-
-            if "abs" in pise:
-                self.abs = pise["abs"]
-            else:
-                self.abs = False
-
-
-            if self.functional == "pbesol":
-                unitcell = ["opt", "band", "dos", "dielectric", "band_nsc", "dielectric_rpa"]
-            else:
-                unitcell = ["opt", "band", "dos", "dielectric"]
-            if self.abs:
-                unitcell.append("abs")
-            
-            self.unitcell = unitcell
-
+            self.nsc = pise["nsc"]
+            self.aexx = pise["aexx"]
+            self.abs = pise["abs"]
+            self.surface = pise["surface"]
+            self.path_to_poscar = pise["path_to_poscar"]
 
         #target_info.jsonを読み込み
         with open("target_info.json") as f:
             target_info = json.load(f)
             self.target_info = target_info
         
-        #vise.yamlを作成
-        vise_yaml = {
-                            'outcar': 'OUTCAR-finish',
-                            'contcar': 'POSCAR-finish',
-                            'overridden_potcar': 'Ga',
-                            'xc': 'pbesol',
-                            'user_incar_settings': {
-                                'ENCUT': 400,
-                                "LWAVE": True
-                            },
-                            'options': {
-                                'set_hubbard_u': True
-                            }
-                            }
-        if self.functional != "pbesol":
-            vise_yaml["xc"] = self.functional
-            vise_yaml["user_incar_settings"]["ALGO"] = "Normal"
-            if pise["aexx"] is not None:
-                vise_yaml["user_incar_settings"]["AEXX"] = pise["aexx"]
-        self.vise_yaml = vise_yaml
-
-        #vise_surface.yamlを作成
-        vise_surface_yaml = {
-                            'outcar': 'OUTCAR-finish',
-                            'contcar': 'POSCAR-finish',
-                            'overridden_potcar': 'Ga',
-                            'xc': 'pbesol',
-                            'user_incar_settings': {
-                                'ENCUT': 400,
-                                'LWAVE': True,
-                                "EDIFF": 1e-07,
-                                "EDIFFG": -0.005,
-                                "ISPIN": 1,
-                                "LVHAR": True,
-                                "LREAL": False
-                            },
-                            'options': {
-                                'set_hubbard_u': True
-                            }
-                            }
-        if self.functional != "pbesol":
-            vise_surface_yaml["xc"] = self.functional
-            vise_surface_yaml["user_incar_settings"]["ALGO"] = "Normal"
-            if pise["aexx"] is not None:
-                vise_surface_yaml["user_incar_settings"]["AEXX"] = pise["aexx"]
-        self.vise_surface_yaml = vise_surface_yaml
-
-
 if __name__ == '__main__':
-    print()
+    pass
