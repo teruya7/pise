@@ -23,20 +23,14 @@ def submit_jobs(piseset, target_dir):
 
             os.chdir(sub_dir)
             if os.path.isfile("ready_for_submission.txt"):
-                if os.path.isfile(piseset.job_script_small):
-                    subprocess.run([f"{piseset.submit_command} {piseset.job_script_small}"], shell=True)
-                elif os.path.isfile(piseset.job_script_large):
-                    subprocess.run([f"{piseset.submit_command} {piseset.job_script_large}"], shell=True)
+                subprocess.run([f"{piseset.submit_command} run*.sh"], shell=True)
                 subprocess.run(["rm ready_for_submission.txt"], shell=True)
             #計算が収束していなかった時
             elif os.path.isfile("POSCAR-10"):
                 print("Calculations have not converged. So the job submitted again.")
                 subprocess.run(["cp POSCAR-10 POSCAR"], shell=True)
                 subprocess.run(["rm -r OUTCAR-* progress-* POSCAR-* repeat-*"], shell=True)
-                if os.path.isfile(piseset.job_script_small):
-                    subprocess.run([f"{piseset.submit_command} {piseset.job_script_small}"], shell=True)
-                elif os.path.isfile(piseset.job_script_large):
-                    subprocess.run([f"{piseset.submit_command} {piseset.job_script_large}"], shell=True)
+                subprocess.run([f"{piseset.submit_command} run*.sh"], shell=True)
             else:
                 print("No ready_for_submission.txt")
             os.chdir("../")

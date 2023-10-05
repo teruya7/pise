@@ -29,14 +29,21 @@ class Doping():
                 else:
                     pise_dopants_and_sites = {"dopants_and_sites": []}
                 
+                #置換サイトの指定がない時は全てのサイトを置換サイトにする
                 if substitutional_site is None:
                     for element in target_material.elements:
-                        pise_dopants_and_sites["dopants_and_sites"].append([dopant, element])
+                        #重複を防ぐ
+                        if not [dopant, substitutional_site] in pise_dopants_and_sites["dopants_and_sites"]:
+                            pise_dopants_and_sites["dopants_and_sites"].append([dopant, element])
+
                         with open("pise_dopants_and_sites.yaml", "w") as f:
                             yaml.dump(pise_dopants_and_sites, f, sort_keys=False)
                 else:
                     if substitutional_site in target_material.elements:
-                        pise_dopants_and_sites["dopants_and_sites"].append([dopant, substitutional_site])
+                        #重複を防ぐ
+                        if not [dopant, substitutional_site] in pise_dopants_and_sites["dopants_and_sites"]:
+                            pise_dopants_and_sites["dopants_and_sites"].append([dopant, substitutional_site])
+
                         with open("pise_dopants_and_sites.yaml", "w") as f:
                             yaml.dump(pise_dopants_and_sites, f, sort_keys=False)
                     else:

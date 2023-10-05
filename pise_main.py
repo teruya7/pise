@@ -7,9 +7,11 @@ from visualization import Visualization
 from summary import Summury
 from markdown import Markdown
 from doping import Doping
+from calculation import Calculation
 
 Fire({
-    "tar": Target, 
+    "tar": Target,
+    "cal": Calculation, 
     "pre": Preparation,
     "ana": Analysis, 
     "vis": Visualization,

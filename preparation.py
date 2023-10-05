@@ -50,16 +50,13 @@ def prepare_job_script(job_script_path, job_script):
     touch.touch()
 
 def prepare_vasp_inputs(target_dir, vise_task_command, job_script_path, job_script):
-    if not os.path.isdir(target_dir):
-        print(f"Preparing {target_dir}.")
-        os.makedirs(target_dir, exist_ok=True)
-        os.chdir(target_dir)
-        if not check_viseset_done():
-            prepare_job_script(job_script_path, job_script)
-            subprocess.run([vise_task_command], shell=True)
-        os.chdir("../")
-    else:
-        print(f"{target_dir} has already prepared.")
+    print(f"Preparing {target_dir}.")
+    os.makedirs(target_dir, exist_ok=True)
+    os.chdir(target_dir)
+    if not check_viseset_done():
+        prepare_job_script(job_script_path, job_script)
+        subprocess.run([vise_task_command], shell=True)
+    os.chdir("../")
 
 #---------------------------------------------------------
 def preparation_opt(piseset, material_id, formula_pretty):
@@ -159,6 +156,11 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
         flag = False
         return flag
 
+    #vise.yamlの読み込み
+    with open("vise.yaml") as file:
+        vise_yaml = yaml.safe_load(file)
+        vise_yaml["options"]["set_hubbard_u"] = False
+
     print("Preparing band_nsc.")
     os.chdir("unitcell")
     aexx = calc_aexx("dielectric_rpa/vasprun.xml")
@@ -166,9 +168,7 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
     os.chdir("band_nsc")
 
     #vise.yamlを作成
-    vise_yaml = piseset.vise_yaml
     with open("vise.yaml", "w") as f:
-        vise_yaml["options"]["set_hubbard_u"] = False
         yaml.dump(vise_yaml, f, sort_keys=False)
 
     if not check_viseset_done():

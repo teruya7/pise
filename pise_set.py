@@ -16,12 +16,6 @@ class PiseSet():
             self.job_script_path = pise_defaults["job_script_path"]
             self.path_to_tsubo = pise_defaults["path_to_tsubo"]
 
-            #job_scriptの設定
-            self.job_script_small = pise_defaults["job_script_small"]
-            self.small_task = pise_defaults["small_task"]
-            self.job_script_large = pise_defaults["job_script_large"]
-            self.large_task = pise_defaults["large_task"]
-
             self.job_table = pise_defaults["job_table"]
 
             #vise.yamlの設定
