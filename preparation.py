@@ -10,6 +10,7 @@ import shutil
 import pathlib
 import yaml
 from pymatgen.io.vasp.outputs import Vasprun
+from hydrogen.hydrogen import get_local_extrema
 
 #ファイルのリストを作成
 def make_file_list():
@@ -97,14 +98,12 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
     #unitcellが準備済みか確認
     if preparation_info["unitcell"]:
         print("Preparation of unitcell has already finished.")
-        flag = True
-        return flag
+        return True
     
     #optの計算が完了しているか確認
     if not calc_info["unitcell"]["opt"]:
         print("opt calculations have not finished yet. So preparing unitcell will be skipped.")
-        flag = False
-        return flag
+        return False
     
     print("Preparing unitcell.")
     os.chdir("unitcell")
@@ -129,32 +128,27 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
         prepare_vasp_inputs("dielectric_rpa", piseset.vise_task_command_dielectric_rpa, piseset.job_script_path, piseset.job_table["dielectric_rpa"])
     
     os.chdir("../")
-    flag = True
 
-    return flag
+    return True
 
 def preparation_band_nsc(piseset, calc_info, preparation_info):
     if preparation_info["band_nsc"]:
         print("Preparation of band_nsc has already finished.")
-        flag = True
-        return flag
+        return True
     
     calc_info["unitcell"].setdefault("band", False)
     if not calc_info["unitcell"]["band"]:
         print("Caluculation of band has not finished yet. So preparing band_nsc will be skipped.")
-        flag = False
-        return flag
+        return False
     
     calc_info["unitcell"].setdefault("dielectric_rpa", False)
     if not calc_info["unitcell"]["dielectric_rpa"]:
         print("Caluculation of dielectric_rpa has not finished yet. So preparing band_nsc will be skipped.")
-        flag = False
-        return flag
+        return False
     
     if not os.path.isfile("unitcell/band/WAVECAR"):
         print("No such file: WAVECAR")
-        flag = False
-        return flag
+        return False
 
     #vise.yamlの読み込み
     with open("vise.yaml") as file:
@@ -172,7 +166,7 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
         yaml.dump(vise_yaml, f, sort_keys=False)
 
     if not check_viseset_done():
-        prepare_job_script(piseset, "band_nsc")
+        prepare_job_script(piseset.job_script_path, piseset.job_table["band_nsc"])
         subprocess.run([f"{piseset.vise_task_command_band_nsc} {aexx}"], shell=True)
         subprocess.run(["cp ../band/WAVECAR ./"], shell=True)
     os.chdir("../../")
@@ -182,15 +176,13 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
     aexx_info["AEXX"] = aexx
     with open("aexx_info.json", "w") as f:
         json.dump(aexx_info, f, indent=4)
-    flag = True
 
-    return flag
+    return True
         
 def preparation_cpd(piseset, preparation_info, elements):
     if preparation_info["cpd"]:
         print("Preparation of cpd has already finished.")
-        flag = True
-        return flag
+        return True
     
     print("Preparing cpd.")
     os.makedirs("cpd", exist_ok=True)
@@ -213,21 +205,18 @@ def preparation_cpd(piseset, preparation_info, elements):
             prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
     
     os.chdir("../")
-    flag = True
 
-    return flag
+    return True
 
 def preparation_defect(piseset, calc_info, preparation_info):
     if preparation_info["defect"]:
         print("Preparation of defect has already finished.")
-        flag = True
-        return flag
+        return True
     
     calc_info["unitcell"].setdefault("dos", False)
     if not calc_info["unitcell"]["dos"]:
         print("dos calculations have not finished yet. So preparing defect will be skipped.")
-        flag = False
-        return flag
+        return False
     
     print("Preparing defect.")
     os.makedirs("defect", exist_ok=True)
@@ -254,15 +243,13 @@ def preparation_defect(piseset, calc_info, preparation_info):
         print("No such file: supercell_info.json")
         os.chdir("../")
         flag = False
-        
-        
+            
     return flag
 
 def preparation_dopant_cpd(piseset, preparation_info, elements, dopant):
     if preparation_info[f"{dopant}_cpd"]:
         print(f"Preparation of {dopant}_cpd has already finished.")
-        flag = True
-        return flag
+        return True
 
     print(f"Preparing {dopant}_cpd.")
     os.makedirs(f"dopant_{dopant}", exist_ok=True)
@@ -291,62 +278,69 @@ def preparation_dopant_cpd(piseset, preparation_info, elements, dopant):
             prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
     
     os.chdir("../../")
-    flag = True
 
-    return flag
+    return True
 
 def preparation_dopant_defect(piseset, preparation_info, dopant, site):
     if preparation_info[f"{dopant}_defect"]:
         print(f"Preparation of {dopant}_defect has already finished.")
-        flag = True
-        return flag
+        return True
 
     if not preparation_info["defect"]:
         print(f"defect preparation have not finished yet. So preparing {dopant}_defect will be skipped.")
-        flag = False
-        return flag
+        return False
 
-    if not preparation_info[f"{dopant}_defect"] and preparation_info["defect"]:
-        print(f"Preparing {dopant}_defect.")
-        os.makedirs(f"dopant_{dopant}", exist_ok=True)
-        os.chdir(f"dopant_{dopant}")
-        os.makedirs("defect", exist_ok=True)
-        os.chdir("defect")
+    print(f"Preparing {dopant}_defect.")
+    os.makedirs(f"dopant_{dopant}", exist_ok=True)
+    os.chdir(f"dopant_{dopant}")
+    os.makedirs("defect", exist_ok=True)
+    os.chdir("defect")
 
-        subprocess.run(["cp ../../defect/supercell_info.json ./"], shell=True)
-        
-        #dopantがHの時はpydefectでHの格子間のPOSCARを作成しない
-        if dopant == "H":
-            subprocess.run([f"pydefect ds -d {dopant} -k {dopant}_{site}"], shell=True)
-        else:
-            subprocess.run([f"pydefect ds -d {dopant} -k {dopant}_i {dopant}_{site}"], shell=True)
+    subprocess.run(["cp ../../defect/supercell_info.json ./"], shell=True)
 
-        subprocess.run(["pydefect_vasp de"], shell=True)
-        subprocess.run(["rm -r perfect"], shell=True)
+    if dopant == "H":
+        with open('../../hydrogen_interstitial_sites.json') as f:
+            hydrogen_interstitial_sites = json.load(f)
 
-        #計算インプットの作成
-        defect_dir_list = make_dir_list()
-        for target_dir in defect_dir_list:
-            if piseset.is_hybrid[piseset.functional]:
+        for site_label in hydrogen_interstitial_sites.keys():
+            x = hydrogen_interstitial_sites[site_label][0]
+            y = hydrogen_interstitial_sites[site_label][1]
+            z = hydrogen_interstitial_sites[site_label][2]
+            subprocess.run([f"pydefect ai -s supercell_info.json -p ../../unitcell/opt/POSCAR-finish -c {x} {y} {z}"], shell=True)
+
+    if site is None:
+        subprocess.run([f"pydefect ds -d {dopant} -k {dopant}_"], shell=True)
+    else:
+        subprocess.run([f"pydefect ds -d {dopant} -k {dopant}_i {dopant}_{site}"], shell=True)
+
+    subprocess.run(["pydefect_vasp de"], shell=True)
+    subprocess.run(["rm -r perfect"], shell=True)
+
+    #計算インプットの作成
+    defect_dir_list = make_dir_list()
+    for target_dir in defect_dir_list:
+        if piseset.is_hybrid[piseset.functional]:
+            if dopant == "H":
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect_hybrid"])
+            else:
                 prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"])
+        else:
+            if dopant == "H":
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect"])
             else:
                 prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
-        
-        os.chdir("../../")
-        flag = True
-
-    return flag
+    
+    os.chdir("../../")
+    return True
 
 def preparation_surface(piseset, calc_info, preparation_info):
     if not calc_info["unitcell"]["opt"]:
         print("Calculation of opt has not finished yet.")
-        flag = False
-        return flag
+        return False
     
     if preparation_info["surface"]:
         print(f"Preparation of surface has already finished.")
-        flag = True
-        return flag
+        return True
     
     print("Preparing surface.")
     os.makedirs("surface", exist_ok=True)
@@ -403,10 +397,101 @@ def preparation_surface(piseset, calc_info, preparation_info):
 
     os.chdir("../")
 
-    flag = True
-        
-    return flag
+    return True
    
+def preparation_hydrogen_interstitial_sites(piseset, calc_info, preparation_info):
+    if preparation_info["hydrogen_interstitial_sites"]:
+        print("Preparation of hydrogen_interstitial_sites has already finished.")
+        return True
+    
+    calc_info["unitcell"].setdefault("dos_accurate", False)
+    if not calc_info["unitcell"]["dos_accurate"]:
+        os.chdir("unitcell")
+        prepare_vasp_inputs("dos_accurate", piseset.vise_task_command_dos_accurate, piseset.job_script_path, piseset.job_table["dos_accurate"])
+        os.chdir("../")
+        print("Caluculation of dos_accurate has not finished yet. So preparing hydrogen_interstitial_sites will be skipped.")
+        return False
+    
+    os.chdir("unitcell/dos_accurate")
+
+    hydrogen_interstitial_sites = defaultdict(dict)
+    radius = 2.5
+
+    #charge_density_minimum を見つける
+    charge_density_threshold = 0.9
+    os.makedirs("CDmin", exist_ok=True)
+    os.chdir("CDmin")
+    while True:
+        try:
+            charge_density_minimum_dict = get_local_extrema("../CHGCAR","../POSCAR-finish", charge_density_threshold, radius, find_min=True)
+            for i, group in enumerate(charge_density_minimum_dict):
+                hydrogen_interstitial_sites[f"CDmin_{i}"] = charge_density_minimum_dict[group]
+            with open("charge_density_threshold.txt", "w") as o:
+                print(charge_density_threshold, file=o)
+            break
+        except KeyError:
+            if charge_density_threshold <= 0.1:
+                break
+            charge_density_threshold -= 0.1
+    os.chdir("../")
+
+    #electric_localized_function_maximum を見つける
+    electric_localized_function_threshold = 0.9
+    os.makedirs("ELFmax", exist_ok=True)
+    os.chdir("ELFmax")
+    while True:
+        try:
+            electric_localized_function_maximum_dict = get_local_extrema("../repeat-1/ELFCAR","../POSCAR-finish", electric_localized_function_threshold, radius)
+            for i, group in enumerate(electric_localized_function_maximum_dict):
+                hydrogen_interstitial_sites[f"ELFmax_{i}"] = electric_localized_function_maximum_dict[group]
+            with open("electric_localized_function_threshold.txt", "w") as o:
+                print(electric_localized_function_threshold, file=o)
+            break
+        except KeyError:
+            if electric_localized_function_threshold <= 0.1:
+                break
+            electric_localized_function_threshold -= 0.1
+    os.chdir("../")
+
+    #local_potential_minimum(LOCPOTは符号が逆)を見つける
+    local_potential_threshold = 0.9
+    os.makedirs("LPmin", exist_ok=True)
+    os.chdir("LPmin")
+    while True:
+        try:
+            local_potential_minimum_dict = get_local_extrema("../repeat-1/LOCPOT","../POSCAR-finish", local_potential_threshold, radius)
+            for i, group in enumerate(local_potential_minimum_dict):
+                hydrogen_interstitial_sites[f"LPmin_{i}"] = local_potential_minimum_dict[group]
+            with open("local_potential_threshold.txt", "w") as o:
+                print(local_potential_threshold, file=o)
+            break
+        except KeyError:
+            if local_potential_threshold <= 0.1:
+                break
+            local_potential_threshold -= 0.1
+    os.chdir("../")
+    
+    os.chdir("../../")
+    
+    #hydrogen_interstitial_sites.jsonの保存
+    with open("hydrogen_interstitial_sites.json", "w") as f:
+        json.dump(hydrogen_interstitial_sites, f, indent=4)
+    
+    #pise_dopants_and_sites.yamlを読み込み、Hを追加する
+    if os.path.isfile("pise_dopants_and_sites.yaml"):
+        with open("pise_dopants_and_sites.yaml") as file:
+            pise_dopants_and_sites = yaml.safe_load(file)
+    else:
+        pise_dopants_and_sites = {"dopants_and_sites": []}
+    
+    if not ["H", None] in pise_dopants_and_sites["dopants_and_sites"]:
+        pise_dopants_and_sites["dopants_and_sites"].append(["H", None])
+    
+    with open("pise_dopants_and_sites.yaml", "w") as f:
+        yaml.dump(pise_dopants_and_sites, f, sort_keys=False)
+
+    return True
+    
 
 class Preparation():
     def __init__(self):
@@ -437,7 +522,12 @@ class Preparation():
                 preparation_info["defect"] = preparation_defect(piseset, calc_info, preparation_info)
 
                 if piseset.nsc:
+                    preparation_info.setdefault("band_nsc", False)
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
+
+                if piseset.hydrogen:
+                    preparation_info.setdefault("hydrogen_interstitial_sites", False)
+                    preparation_info["hydrogen_interstitial_sites"] = preparation_hydrogen_interstitial_sites(piseset, calc_info, preparation_info)
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     with open("pise_dopants_and_sites.yaml") as file:

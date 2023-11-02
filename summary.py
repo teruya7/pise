@@ -4,6 +4,7 @@ import yaml
 from collections import defaultdict
 from pymatgen.io.vasp import Poscar
 from pymatgen.io.vasp import Kpoints
+from pymatgen.io.vasp.outputs import Vasprun
 from pise_set import PiseSet
 from target import TargetHandler
 from analysis import get_label_from_chempotdiag
@@ -50,6 +51,13 @@ class Summury():
                         summary_info["POSCAR"]["b"] = format(poscar_dict["structure"]["lattice"]["b"], ".3f")
                         summary_info["POSCAR"]["c"] = format(poscar_dict["structure"]["lattice"]["c"], ".3f")
                         summary_info["POSCAR"]["n_atoms"] = sum(poscar.natoms)
+
+                        vasprun = Vasprun("unitcell/opt/vasprun.xml")
+                        poscar = Poscar.from_file("unitcell/opt/POSCAR-finish")
+                        final_energy = vasprun.final_energy
+                        natoms = sum(poscar.natoms)
+                        energy_per_atom = final_energy / natoms
+                        summary_info["energy_per_atom"] = format(energy_per_atom, ".4f")
 
                         with open("unitcell/unitcell.yaml") as file:
                             unitcell_dict = yaml.safe_load(file)

@@ -6,7 +6,7 @@ import json
 from target import TargetHandler
 from calculation import Calculation
 from doping import get_dopants_list
-from surface import plot_band_alignment, calculation_surface_energy, plot_averaged_locpot
+from surface.surface import plot_band_alignment, calculation_surface_energy, plot_averaged_locpot
 from cpd import avoid_unstable_error, pydefect_cv_dopant, reduced_cpd, get_label_from_chempotdiag
 
 def load_analysis_info():
@@ -84,11 +84,14 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
         band = "band"
 
     #unitcellの計算が完了しているか確認
-    if not calc_info["unitcell"][band]:
+    try:
+        if not calc_info["unitcell"][band]:
+            print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
+            return False
+    except KeyError:
         print(f"{band} calculations have not finished yet. So analysis of unitcell will be skipped.")
-        flag = False
-        return flag
-    
+        return False
+
     if not calc_info["unitcell"]["dielectric"]:
         print("dielectric calculations have not finished yet. So analysis of unitcell will be skipped.")
         flag = False

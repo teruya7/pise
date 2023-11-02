@@ -30,11 +30,13 @@ class PiseSet():
             self.vise_task_command_band = pise_defaults["vise_task_command_band"]
             self.vise_task_command_band_nsc = pise_defaults["vise_task_command_band_nsc"]
             self.vise_task_command_dos = pise_defaults["vise_task_command_dos"]
+            self.vise_task_command_dos_accurate = pise_defaults["vise_task_command_dos_accurate"]
             self.vise_task_command_dielectric = pise_defaults["vise_task_command_dielectric"]
             self.vise_task_command_dielectric_rpa = pise_defaults["vise_task_command_dielectric_rpa"]
             self.vise_task_command_dielectric_hybrid = pise_defaults["vise_task_command_dielectric_hybrid"]
             self.vise_task_command_abs = pise_defaults["vise_task_command_abs"]
             self.vise_task_command_defect = pise_defaults["vise_task_command_defect"]
+            self.vise_task_command_defect_hydrogen = pise_defaults["vise_task_command_defect_hydrogen"]
             self.vise_task_command_surface = pise_defaults["vise_task_command_surface"]
 
             #vise_analysis_command
@@ -64,6 +66,7 @@ class PiseSet():
             self.aexx = pise["aexx"]
             self.abs = pise["abs"]
             self.surface = pise["surface"]
+            self.hydrogen = pise["hydrogen"]
             self.path_to_poscar = pise["path_to_poscar"]
 
         #target_info.jsonを読み込み

@@ -3,18 +3,31 @@ MY_API_KEY: null
 
 #スパコンの環境変数の設定
 limit_jobs: 1800
+# num_jobs_command: qgroup | grep Nagafuji | awk '{print$6}' | sed 's/[(]//g'
 num_jobs_command: null
-submit_command: null
-submission_ready: ready_for_submission.txt
-job_script_path: null
-interstitial_explorer_path: null
-path_to_tsubo: null
+submit_command: sbatch
+job_script_path: /LARGE0/gr10261/nagafuji/scripts
+path_to_tsubo: /LARGE0/gr10261/nagafuji/scripts/tsubo.pl
 
-#job_scriptの設定
-job_script_small: run6.4.1_1.sh
-small_task: ["opt", "band", "dos", "abs"]
-job_script_large: run6.4.1_4.sh
-large_task: ["defect", "dielectric", "dielectric_rpa", "band_nsc", "surface"]
+#vise_taskとjobスクリプトの対応表
+job_table:
+  opt: run6.4.1_28.sh
+  opt_hybrid: run6.4.1_56.sh
+  band: run6.4.1_28.sh
+  band_nsc: run6.4.1_112.sh
+  band_hybrid: run6.4.1_56.sh
+  dos: run6.4.1_28.sh
+  dos_hybrid: run6.4.1_56.sh
+  dos_accurate: run6.4.1_112.sh
+  dielectric: run6.4.1_56.sh
+  dielectric_rpa: run6.4.1_56.sh
+  dielectric_hybrid: run6.4.1_56_dielectric.sh
+  abs: run6.4.1_112.sh
+  abs_hybrid: run6.4.1_112.sh
+  defect: run6.4.1_56.sh
+  defect_hybrid: run6.4.1_gpu4.sh
+  surface: run6.4.1_56.sh
+  surface_hybrid: run6.4.1_gpu4.sh
 
 
 #vise_task_commandの設定
@@ -22,26 +35,64 @@ vise_task_command_opt: vise vs -uis ENCUT 520
 vise_task_command_band: vise vs -t band -pd ../opt -uis LWAVE True
 vise_task_command_band_nsc: vise vs -t band -pd ../opt -x pbe0 -uis ALGO Subrot NELM 1 HFRCUT -1 AEXX
 vise_task_command_dos: vise vs -t dos -pd ../opt -uis LVTOT True LAECHG True KPAR 1
-vise_task_command_dos_accurate: vise vs -t dos -d ../opt -uis PREC Accurate EDIFF 1e-08 NELM 300 LCHARG True LELF True LVHAR True KPAR 1
+vise_task_command_dos_accurate: vise vs -t dos -pd ../opt -uis PREC Accurate EDIFF 1e-08 NELM 300 LCHARG True LELF True LVHAR True KPAR 1
 vise_task_command_dielectric: vise vs -t dielectric_dfpt -pd ../opt
 vise_task_command_dielectric_rpa: vise vs -t dielectric_dfpt -pd ../opt -uis LRPA True
-vise_task_command_dielectric_hybrid: vise vs -t dielectric_finite_field -d ../opt -uis IBRION 6
+vise_task_command_dielectric_hybrid: vise vs -t dielectric_finite_field -pd ../opt -uis IBRION 6
 vise_task_command_abs: vise vs -t dielectric_function -pd ../opt
 vise_task_command_defect: vise vs -t defect -uis SYMPREC 1e-4 --options only_even_num_kpts True
 vise_task_command_surface: vise vs -t defect -uis SYMPREC 1e-4 --options only_even_num_kpts True
 
+
 #vise_analysis_command
-vise_analysis_command_plot_band: vise pb
+vise_analysis_command_plot_band: vise pb -y -10 20
 vise_analysis_command_plot_dos: vise pd
 vise_analysis_command_effective_mass: vise em -t 300 -c 16
 vise_analysis_command_plot_abs: vise pdf -ckk
 vise_analysis_command_unitcell_nsc:  pydefect_vasp u -vb band_nsc/vasprun.xml -ob band_nsc/OUTCAR-finish -odc dielectric/OUTCAR-finish -odi dielectric/OUTCAR-finish
 vise_analysis_command_unitcell_hybrid:  pydefect_vasp u -vb band/vasprun.xml -ob band/OUTCAR-finish -odc dielectric/OUTCAR -odi dielectric/OUTCAR
 
-#マウントした時のlocalのパス
-local_path: null
+#vise.yaml(defect)の設定
+vise_yaml:
+  outcar: OUTCAR-finish
+  contcar: POSCAR-finish
+  overridden_potcar: Ga
+  xc: null
+  user_incar_settings:
+    ENCUT: 400
+    LWAVE: True
+    ALGO: Normal
+  options:
+    set_hubbard_u: True
 
-#surface
+#vise.yaml(surface)の設定
+vise_surface_yaml:
+  outcar: OUTCAR-finish
+  contcar: POSCAR-finish
+  overridden_potcar: Ga
+  xc: null
+  user_incar_settings:
+    ENCUT: 400
+    LWAVE: True
+    EDIFF: 1e-07
+    EDIFFG: -0.005
+    ISPIN: 1
+    LVHAR: True
+    LREAL: False
+    ALGO: Normal
+  options:
+    set_hubbard_u: True
+
+is_hybrid:
+  pbesol: False
+  pbe: False
+  hse: True
+  pbe0: True
+
+#マウントした時のlocalのパス
+local_path: /Users/nagafuji/mnt/laurel
+
+#surface(tsuboのパラメーター)
 slab_thickness: 20
 vaccum_thickness: 15
 h: 2

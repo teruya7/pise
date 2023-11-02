@@ -56,7 +56,10 @@ class Target():
 
         #target_infoにデータを追加
         target_info = self.target_info
-        target_info.append(MPdatadict)
+        if not MPdatadict in target_info:
+            target_info.append(MPdatadict)
+        else:
+            print("This target has already been added.")
 
         #target_info.jsonにデータを保存
         with open(self.name, "w") as f:

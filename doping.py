@@ -29,25 +29,15 @@ class Doping():
                 else:
                     pise_dopants_and_sites = {"dopants_and_sites": []}
                 
-                #置換サイトの指定がない時は全てのサイトを置換サイトにする
-                if substitutional_site is None:
-                    for element in target_material.elements:
-                        #重複を防ぐ
-                        if not [dopant, substitutional_site] in pise_dopants_and_sites["dopants_and_sites"]:
-                            pise_dopants_and_sites["dopants_and_sites"].append([dopant, element])
+                if substitutional_site in target_material.elements or substitutional_site is None:
+                    #重複を防ぐ
+                    if not [dopant, substitutional_site] in pise_dopants_and_sites["dopants_and_sites"]:
+                        pise_dopants_and_sites["dopants_and_sites"].append([dopant, substitutional_site])
 
-                        with open("pise_dopants_and_sites.yaml", "w") as f:
-                            yaml.dump(pise_dopants_and_sites, f, sort_keys=False)
+                    with open("pise_dopants_and_sites.yaml", "w") as f:
+                        yaml.dump(pise_dopants_and_sites, f, sort_keys=False)
                 else:
-                    if substitutional_site in target_material.elements:
-                        #重複を防ぐ
-                        if not [dopant, substitutional_site] in pise_dopants_and_sites["dopants_and_sites"]:
-                            pise_dopants_and_sites["dopants_and_sites"].append([dopant, substitutional_site])
-
-                        with open("pise_dopants_and_sites.yaml", "w") as f:
-                            yaml.dump(pise_dopants_and_sites, f, sort_keys=False)
-                    else:
-                        print(f"No substitutional sites: {substitutional_site} exists in {target_material.formula_pretty}")
+                    print(f"No substitutional sites: {substitutional_site} exists in {target_material.formula_pretty}")
 
                 os.chdir("../../")
             else:

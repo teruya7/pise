@@ -9,11 +9,12 @@ from decimal import Decimal, getcontext, ROUND_HALF_UP
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.outputs import Vasprun, Locpot, VolumetricData, Outcar
 
+#無極性かつ組成がズレ表面を対象としていることに注意
 def calculation_surface_energy(surface_target_info):
     #bulkの計算結果をを取得
     bulk_structure = Structure.from_file("../unitcell/opt/POSCAR-finish")
     bulk_vasprun = Vasprun("../unitcell/opt/vasprun.xml")
-    bulk_totalenergy = bulk_vasprun.final_energy / bulk_structure.num_sites
+    bulk_totalenergy_per_atom = bulk_vasprun.final_energy / bulk_structure.num_sites
     
     #最初のsurface_energyの比較用
     min_surface_energy = float("inf")
@@ -27,9 +28,9 @@ def calculation_surface_energy(surface_target_info):
         #surfaceの計算結果を取得
         surface_structure = Structure.from_file(f"{path}/POSCAR-finish")
         surface_vasprun = Vasprun(f"{path}/vasprun.xml")
-        surface_totalenergy = surface_vasprun.final_energy / surface_structure.num_sites
+        surface_totalenergy = surface_vasprun.final_energy
         surface_area = 2 * np.linalg.norm(np.cross(surface_structure.lattice.matrix[0], surface_structure.lattice.matrix[1]))
-        surface_energy = (surface_totalenergy - bulk_totalenergy) / surface_area
+        surface_energy = (surface_totalenergy - bulk_totalenergy_per_atom * surface_structure.num_sites) / surface_area
         
         surface_energy_dict = defaultdict(dict)
         surface_energy_dict["surface_index"] = surface_index
