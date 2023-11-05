@@ -129,14 +129,16 @@ def analysis_cpd(target_material, calc_info, analysis_info):
     #cpdが解析済みかどうか確認
     if analysis_info["cpd"]:
         print("Analysis of cpd has already finished.")
-        flag = True
-        return flag
+        return True
     
     #cpdの計算が完了しているか確認
-    if not check_calc_alldone(calc_info["cpd"].values()):
+    try:
+        if not check_calc_alldone(calc_info["cpd"].values()):
+            print("cpd calculations have not finished yet. So analysis of cpd will be skipped.")
+            return False
+    except KeyError:
         print("cpd calculations have not finished yet. So analysis of cpd will be skipped.")
-        flag = False
-        return flag
+        return False
 
     print("Analyzing cpd.")
     os.chdir("cpd") 
@@ -163,26 +165,26 @@ def analysis_defect(calc_info, analysis_info):
     #defectが解析済みかどうか確認
     if analysis_info["defect"]:
         print("Analysis of defect has already finished.")
-        flag = True
-        return flag
+        return True
     
     #unitcellが解析済みかどうか確認
     if not analysis_info["unitcell"]:
         print("Analysis of unitcell has not finished yet. So analysis of defect will be skipped.")
-        flag = False
-        return flag
+        return False
     
     #unitcellが解析済みかどうか確認
     if not analysis_info["cpd"]:
         print("Analysis of cpd has not finished yet. So analysis of defect will be skipped.")
-        flag = False
-        return flag
+        return False
 
     #defectの計算が完了しているか確認
-    if not check_calc_alldone(calc_info["defect"].values()):
+    try:
+        if not check_calc_alldone(calc_info["defect"].values()):
+            print("defect calculations have not finished yet. So analysis of defect will be skipped.")
+            return False
+    except KeyError:
         print("defect calculations have not finished yet. So analysis of defect will be skipped.")
-        flag = False
-        return flag
+        return False
 
     print("Analyzing defect.")
     os.chdir("defect") 
@@ -211,26 +213,26 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
     #dopantのcpdが解析済みかどうか確認
     if analysis_info[f"{dopant}_cpd"]:
         print(f"Analysis of {dopant}_cpd has already finished.")
-        flag = True
-        return flag
+        return True
     
     #cpdが解析済みかどうか確認
     if not analysis_info["cpd"]:
         print(f"Analysis of cpd has not finished yet. So analysis of {dopant}_cpd will be skipped.")
-        flag = False
-        return flag
+        return False
     
     #dopantのcpdフォルダがあるか確認
     if not os.path.isdir(f"dopant_{dopant}/cpd"):
         print(f"No such directory: cpd in dopant_{dopant}")
-        flag = False
-        return flag
+        return False
 
     #dopantのcpdの計算が完了しているか確認
-    if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["cpd"].values()):
+    try:
+        if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["cpd"].values()):
+            print(f"dopant_{dopant}'s cpd calculations have not finished yet. So analysis of dopant_{dopant}'s cpd will be skipped.")
+            return False
+    except KeyError:
         print(f"dopant_{dopant}'s cpd calculations have not finished yet. So analysis of dopant_{dopant}'s cpd will be skipped.")
-        flag = False
-        return flag
+        return False
 
     print(f"Analyzing dopant_{dopant}'s cpd.")
     os.chdir(f"dopant_{dopant}/cpd")
@@ -267,32 +269,31 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
     #dopantのdefectが解析済みかどうか確認
     if analysis_info[f"{dopant}_defect"]:
         print(f"Analysis of {dopant}_defect has already finished.")
-        flag = True
-        return flag
+        return True
     
     #defectが解析済みかどうか確認
     if not analysis_info["defect"]:
         print(f"Analysis of defect has not finished yet. So analysis of {dopant}_defect will be skipped.")
-        flag = False
-        return flag
+        return False
     
     #dopantのcpdが解析済みかどうか確認
     if not analysis_info[f"{dopant}_cpd"]:
         print(f"Analysis of {dopant}_cpd has not finished yet. So analysis of {dopant}_defect will be skipped.")
-        flag = False
-        return flag
+        return False
 
     #dopnatのdefectフォルダがあるか確認
     if not os.path.isdir(f"dopant_{dopant}/defect"):
         print(f"No such directory: dopant_{dopant}'s defect")
-        flag = False
-        return flag
+        return False
     
     #dopantのdefectの計算が完了しているか確認
-    if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
+    try:
+        if not check_calc_alldone(calc_info[f"dopant_{dopant}"]["defect"].values()):
+            print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
+            return False
+    except KeyError:
         print(f"dopant_{dopant}'s defect calculations have not finished yet. So analysis of dopant_{dopant}'s defect will be skipped.")
-        flag = False
-        return flag
+        return False
     
     print(f"Analyzing dopant_{dopant}'s defect.")
     os.chdir(f"dopant_{dopant}/defect") 
@@ -326,28 +327,24 @@ def analysis_dopant_defect(dopant, calc_info, analysis_info):
 
     os.chdir("../../")
         
-
     return flag
 
 def analysis_surface(calc_info, analysis_info):
     #surfaceが解析済みかどうか確認
     if analysis_info["surface"]:
-        flag = True
         print("Analysis of surface has already finished.")
-        return flag
+        return True
     
     #unitcellが解析済みかどうか確認
     if not analysis_info["unitcell"]:
         print("Analysis of unitcell has not finished yet. So analysis of surface will be skipped.")
-        flag = False
-        return flag
+        return False
     
     #surfaceの計算が完了しているか確認
     for surface in calc_info["surface"].keys():
         if not check_calc_alldone(calc_info["surface"][surface].values()):
             print("surface calculations have not finished yet. So analysis of cpd will be skipped.")
-            flag = False
-            return flag
+            return False
         
     print("Analyzing surface.")
     os.chdir("surface") 

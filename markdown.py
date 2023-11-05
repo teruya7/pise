@@ -144,7 +144,7 @@ class Markdown():
                         if os.path.isfile("pise_dopants_and_sites.yaml"):
                             dopants = get_dopants_list()
                             for dopant in dopants:
-                                f.write(f"# {dopant}\n")
+                                f.write(f"# dopant_{dopant}\n")
                                 f.write("## cpd\n")
                                 f.write(f"![Alt text](dopant_{dopant}/cpd/cpd.png)\n")
                                 f.write("# defect formation energy\n")
