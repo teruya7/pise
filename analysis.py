@@ -6,7 +6,7 @@ import json
 from target import TargetHandler
 from calculation import Calculation
 from doping import get_dopants_list
-from surface.surface import plot_band_alignment, calculation_surface_energy, plot_averaged_locpot
+from surface import plot_band_alignment, calculation_surface_energy, plot_averaged_locpot
 from cpd import avoid_unstable_error, pydefect_cv_dopant, reduced_cpd, get_label_from_chempotdiag
 
 def load_analysis_info():
@@ -125,11 +125,31 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
 
     return flag
 
-def analysis_cpd(target_material, calc_info, analysis_info):
+def analysis_cpd(target_material, piseset, calc_info, analysis_info):
     #cpdが解析済みかどうか確認
     if analysis_info["cpd"]:
         print("Analysis of cpd has already finished.")
         return True
+
+    #データベースからデータを取得
+    if piseset.cpd_database:
+        if os.path.isfile('cpd/competing_phases_info.json'):
+            with open('cpd/competing_phases_info.json') as f:
+                competing_phases_info = json.load(f)
+            for competing_phase in competing_phases_info["competing_phases"]:
+                try:
+                    if calc_info["cpd"][competing_phase]:
+                        pass
+                    else:
+                        subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
+                        if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
+                            calc_info["cpd"][competing_phase] = True
+                except KeyError:
+                    subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
+                    if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
+                        calc_info["cpd"][competing_phase] = True
+        else:
+            return False
     
     #cpdの計算が完了しているか確認
     try:
@@ -139,7 +159,7 @@ def analysis_cpd(target_material, calc_info, analysis_info):
     except KeyError:
         print("cpd calculations have not finished yet. So analysis of cpd will be skipped.")
         return False
-
+    
     print("Analyzing cpd.")
     os.chdir("cpd") 
     if not os.path.isdir("host"):
@@ -149,7 +169,10 @@ def analysis_cpd(target_material, calc_info, analysis_info):
     if not os.path.isfile("relative_energies.yaml"):
         subprocess.run(["pydefect sre"], shell=True)
     if not os.path.isfile("target_vertices.yaml"):
-        subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+        if hasattr(target_material, "name"):
+            subprocess.run([f"pydefect cv -t {target_material.name}"], shell=True)
+        else:
+            subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
     flag = check_analysis_done("target_vertices.yaml")
     
     avoid_unstable_error(flag, target_material)
@@ -209,7 +232,7 @@ def analysis_defect(calc_info, analysis_info):
         
     return flag
 
-def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
+def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, piseset):
     #dopantのcpdが解析済みかどうか確認
     if analysis_info[f"{dopant}_cpd"]:
         print(f"Analysis of {dopant}_cpd has already finished.")
@@ -224,6 +247,26 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info):
     if not os.path.isdir(f"dopant_{dopant}/cpd"):
         print(f"No such directory: cpd in dopant_{dopant}")
         return False
+
+    #データベースからデータを取得
+    if piseset.cpd_database:
+        if os.path.isfile(f'dopant_{dopant}/cpd/competing_phases_info.json'):
+            with open(f'dopant_{dopant}/cpd/competing_phases_info.json') as f:
+                competing_phases_info = json.load(f)
+            for competing_phase in competing_phases_info["competing_phases"]:
+                try:
+                    if calc_info[f"dopant_{dopant}"]["cpd"][competing_phase]: #既にデータがある場合
+                        pass
+                    else: #データはあるが計算が完了しておらず、データベースからデータを取得したい場合
+                        subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
+                        if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
+                            calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
+                except KeyError: #まだデータベースからデータを取得していない場合
+                    subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
+                    if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
+                        calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
+        else:
+            return False
 
     #dopantのcpdの計算が完了しているか確認
     try:
@@ -422,7 +465,7 @@ class Analysis():
                     dopants = get_dopants_list()
                     for dopant in dopants:
                         analysis_info.setdefault(f"{dopant}_cpd", False)
-                        analysis_info[f"{dopant}_cpd"] = analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info)
+                        analysis_info[f"{dopant}_cpd"] = analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, piseset)
                         analysis_info.setdefault(f"{dopant}_defect", False)
                         analysis_info[f"{dopant}_defect"] = analysis_dopant_defect(dopant, calc_info, analysis_info)
                 

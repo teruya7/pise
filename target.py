@@ -9,6 +9,7 @@ def MPDataDoc_to_dict(MPDataDoc):
     material_id = MPDataDoc.material_id
     formula_pretty = MPDataDoc.formula_pretty
     elements = MPDataDoc.elements
+    composition_reduced = MPDataDoc.composition_reduced
 
     element_list = []
     for element in elements:
@@ -18,7 +19,10 @@ def MPDataDoc_to_dict(MPDataDoc):
     #MPdatadictを作成し、データを追加
     MPdatadict = defaultdict(dict)
     MPdatadict["material_id"] = material_id
-    MPdatadict["formula_pretty"] = formula_pretty
+    if "(" in formula_pretty:
+        MPdatadict["formula_pretty"] = composition_reduced.alphabetical_formula.replace(" ", "")
+    else:
+        MPdatadict["formula_pretty"] = formula_pretty
     MPdatadict["elements"] = element_list
     return MPdatadict
 
@@ -26,7 +30,7 @@ class Target():
     def __init__(self):
         self.name = "target_info.json"
         #Materials projectから取得する値を指定
-        self.fields = ["material_id", "formula_pretty", "elements"]
+        self.fields = ["material_id", "formula_pretty", "elements", "composition_reduced"]
 
         #pise_defaults.yamからAPIキーを読み込む
         home = home = os.environ['HOME']
@@ -70,6 +74,10 @@ class TargetHandler():
         self.formula_pretty = target["formula_pretty"]
         self.material_id = target["material_id"]
         self.elements = target["elements"]
+        try:
+            self.name = target["name"]
+        except KeyError:
+            pass
         print()
         print(f"Parsing {self.formula_pretty}_{self.material_id}")
     

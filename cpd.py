@@ -4,7 +4,9 @@ import string
 import subprocess
 import json
 import yaml
-from calculation import make_dir_list
+from collections import defaultdict
+from pise_set import PiseSet
+from calculation import make_dir_list, is_calc_converged
 from pymatgen.core.composition import Composition
 from pymatgen.core.periodic_table import Element
 
@@ -31,20 +33,28 @@ def avoid_unstable_error(flag, target_material, dopant=None):
     while not flag:
         if not os.path.isfile("unstable_error.txt"):
             subprocess.run(["touch unstable_error.txt"], shell=True)
+
         with open("relative_energies.yaml") as file:
             relative_energies = yaml.safe_load(file)
-            try:
-                relative_energies[target_material.formula_pretty] -= 0.01
-            except KeyError:
-                print(f"Target {target_material.formula_pretty} is not in relative energy compounds, so stop here.")
-                break
-        with open("relative_energies.yaml", 'w') as file:
-            yaml.dump(relative_energies, file)
 
-        if dopant is not None:
-            pydefect_cv_dopant(target_material, dopant)
-        else:
-            subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+            if hasattr(target_material, "name"):
+                target = target_material.name
+                relative_energies[target] -= 0.01
+            else:
+                try:
+                    target = target_material.formula_pretty
+                    relative_energies[target] -= 0.01
+                except (KeyError, ValueError):
+                    print(f"Target {target} is not in relative energy compounds, so stop here.")
+                    break
+
+            with open("relative_energies.yaml", 'w') as file:
+                yaml.dump(relative_energies, file)
+                
+            if dopant is not None:
+                pydefect_cv_dopant(target_material, dopant)
+            else:
+                subprocess.run([f"pydefect cv -t {target}"], shell=True)
 
         if os.path.isfile("target_vertices.yaml"):
             flag = True
@@ -118,3 +128,30 @@ def get_label_from_chempotdiag(path_chem_pot_diag):
     for label in chem_pot["target_vertices_dict"]:
         labels.append(label)
     return labels
+
+class Database():
+    def __init__(self):
+        piseset = PiseSet()
+
+        self.path = piseset.path_to_cpd_database + "/" + piseset.functional
+        cwd = os.getcwd()
+
+        if os.path.isdir(f"{self.path}"):
+            os.chdir(f"{self.path}")
+            
+            calc_info = defaultdict(dict)
+            self.datalist = make_dir_list()
+            
+            for data in self.datalist:
+                if is_calc_converged(data):
+                    calc_info[data] = True
+                else:
+                    calc_info[data] = False
+
+            #calc_info.jsonの保存
+            with open("calc_info.json", "w") as f:
+                json.dump(calc_info, f, indent=4)
+
+            os.chdir(cwd)
+        else:
+            print(f"No such directory: {self.path}")

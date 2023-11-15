@@ -15,6 +15,7 @@ class PiseSet():
             self.num_jobs_command = pise_defaults["num_jobs_command"]
             self.job_script_path = pise_defaults["job_script_path"]
             self.path_to_tsubo = pise_defaults["path_to_tsubo"]
+            self.path_to_cpd_database = pise_defaults["path_to_cpd_database"]
 
             self.job_table = pise_defaults["job_table"]
 
@@ -67,6 +68,7 @@ class PiseSet():
             self.abs = pise["abs"]
             self.surface = pise["surface"]
             self.hydrogen = pise["hydrogen"]
+            self.cpd_database = pise["cpd_database"]
             self.path_to_poscar = pise["path_to_poscar"]
 
         #target_info.jsonを読み込み

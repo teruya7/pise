@@ -17,9 +17,12 @@ def submit_jobs(piseset, target_dir):
             if piseset.num_jobs_command is not None:
                 num_jobs = subprocess.run([f"{piseset.num_jobs_command}"], capture_output=True, text=True, shell=True).stdout
                 print(num_jobs)
-                if int(num_jobs) >= int(piseset.limit_jobs):
-                    print("The maximum number of calculations has been reached.")
-                    break
+                try:
+                    if int(num_jobs) >= int(piseset.limit_jobs):
+                        print("The maximum number of calculations has been reached.")
+                        break
+                except ValueError:
+                    print("ValueError")
 
             os.chdir(sub_dir)
             if os.path.isfile("ready_for_submission.txt"):
@@ -161,3 +164,16 @@ class Submission():
             else:
                 print(f"No such directory: {path}")
                 print()
+
+    def database(self):
+        path = self.piseset.path_to_cpd_database
+        functional = self.piseset.functional
+        if os.path.isdir(path):
+            os.chdir(path)
+            if os.path.isdir(functional):
+                submit_jobs(self.piseset, functional)
+            else:
+                print(f"No such directory: {functional}")
+        else:
+            print(f"No such directory: {path}")
+

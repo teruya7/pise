@@ -1,7 +1,7 @@
 from target import TargetHandler
 from calculation import Calculation, make_dir_list
 from pise_set import PiseSet
-from cpd import delete_duplication
+from cpd import delete_duplication, Database
 import os
 from collections import defaultdict
 import json
@@ -179,7 +179,7 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
 
     return True
         
-def preparation_cpd(piseset, preparation_info, elements):
+def preparation_cpd(piseset, preparation_info, elements, cpd_database):
     if preparation_info["cpd"]:
         print("Preparation of cpd has already finished.")
         return True
@@ -196,13 +196,40 @@ def preparation_cpd(piseset, preparation_info, elements):
     elif len(elements) == 4:
         subprocess.run([f"pydefect_vasp mp -e {elements[0]} {elements[1]} {elements[2]} {elements[3]} --e_above_hull 0.0005"], shell=True)
 
-    #計算インプットの作成
-    cpd_dir_list = make_dir_list()
-    for target_dir in cpd_dir_list:
-        if piseset.is_hybrid[piseset.functional]:
-            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
-        else:
-            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
+    competing_phases_list = make_dir_list()
+    try:
+        competing_phases_list.remove("host")
+    except ValueError:
+        pass
+
+    #competing_phases_info.jsonの保存
+    competing_phases_dict = defaultdict(dict)
+    competing_phases_dict["competing_phases"] = competing_phases_list
+    with open("competing_phases_info.json", "w") as f:
+        json.dump(competing_phases_dict, f, indent=4)
+
+    #cpdのデータベースの作成(データベースにデータがあればデータを利用)
+    if piseset.cpd_database:
+
+        #計算インプットの作成
+        for target_dir in competing_phases_list:
+            if target_dir not in cpd_database.datalist:
+                if piseset.is_hybrid[piseset.functional]:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+                else:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
+                subprocess.run([f"cp -r {target_dir} {piseset.path_to_cpd_database}/{piseset.functional}/"], shell=True)
+                print(f"{target_dir} has been added to the database.")
+            else:
+                print(f"{target_dir} has already existed in the database.")
+    else:
+        #データベースを利用しない場合
+        #計算インプットの作成
+        for target_dir in competing_phases_list:
+            if piseset.is_hybrid[piseset.functional]:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+            else:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
     
     os.chdir("../")
 
@@ -238,15 +265,14 @@ def preparation_defect(piseset, calc_info, preparation_info):
                 prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
         
         os.chdir("../")
-        flag = True
+        return True
+    
     else:
         print("No such file: supercell_info.json")
         os.chdir("../")
-        flag = False
+        return False
             
-    return flag
-
-def preparation_dopant_cpd(piseset, preparation_info, elements, dopant):
+def preparation_dopant_cpd(piseset, preparation_info, elements, dopant, cpd_database):
     if preparation_info[f"{dopant}_cpd"]:
         print(f"Preparation of {dopant}_cpd has already finished.")
         return True
@@ -269,13 +295,40 @@ def preparation_dopant_cpd(piseset, preparation_info, elements, dopant):
     #cpd内の重複を削除
     delete_duplication("../../cpd", cwd)
 
-    #計算インプットの作成
-    cpd_dir_list = make_dir_list()
-    for target_dir in cpd_dir_list:
-        if piseset.is_hybrid[piseset.functional]:
-            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
-        else:
-            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
+    competing_phases_list = make_dir_list()
+    try:
+        competing_phases_list.remove("host")
+    except ValueError:
+        pass
+
+    #competing_phases_info.jsonの保存
+    competing_phases_dict = defaultdict(dict)
+    competing_phases_dict["competing_phases"] = competing_phases_list
+    with open("competing_phases_info.json", "w") as f:
+        json.dump(competing_phases_dict, f, indent=4)
+
+    #cpdのデータベースの作成(データベースにデータがあればデータを利用)
+    if piseset.cpd_database:
+
+        #計算インプットの作成
+        for target_dir in competing_phases_list:
+            if target_dir not in cpd_database.datalist:
+                if piseset.is_hybrid[piseset.functional]:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+                else:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
+                subprocess.run([f"cp -r {target_dir} {piseset.path_to_cpd_database}/{piseset.functional}/"], shell=True)
+                print(f"{target_dir} has been added to the database.")
+            else:
+                print(f"{target_dir} has already existed in the database.")
+    else:
+        #データベースを利用しない場合
+        #計算インプットの作成
+        for target_dir in competing_phases_list:
+            if piseset.is_hybrid[piseset.functional]:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+            else:
+                prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
     
     os.chdir("../../")
 
@@ -503,6 +556,7 @@ class Preparation():
 
         for target in piseset.target_info:
             target_material = TargetHandler(target)
+            cpd_database = Database()
             path = target_material.make_path(piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
@@ -516,7 +570,7 @@ class Preparation():
                 preparation_info["unitcell"] = preparation_unitcell(piseset, calc_info, preparation_info)
 
                 preparation_info.setdefault("cpd", False)
-                preparation_info["cpd"] = preparation_cpd(piseset, preparation_info, target_material.elements)
+                preparation_info["cpd"] = preparation_cpd(piseset, preparation_info, target_material.elements, cpd_database)
 
                 preparation_info.setdefault("defect", False)
                 preparation_info["defect"] = preparation_defect(piseset, calc_info, preparation_info)
@@ -537,7 +591,7 @@ class Preparation():
                         site = dopant_and_site[1]
 
                         preparation_info.setdefault(f"{dopant}_cpd", False)
-                        preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant)
+                        preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, target_material.elements, dopant, cpd_database)
                         
                         preparation_info.setdefault(f"{dopant}_defect", False)
                         preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant, site)
