@@ -23,6 +23,7 @@ def make_base_markdown(piseset, summary_info):
 |  b |  {poscar_b}  |
 |  c  |  {poscar_c}  |
 |  n_atoms  |  {poscar_n_atoms}  |
+|  symmetry  |  {symmetry}  |
 
 ## band
 |  band  |    |
@@ -86,6 +87,7 @@ def make_base_markdown(piseset, summary_info):
                                     poscar_b = summary_info["POSCAR"]["b"],
                                     poscar_c = summary_info["POSCAR"]["c"],
                                     poscar_n_atoms = summary_info["POSCAR"]["n_atoms"],
+                                    symmetry = summary_info["symmetry"],
                                     band_gap = summary_info["band_gap"],
                                     vbm = summary_info["vbm"],
                                     cbm = summary_info["cbm"],

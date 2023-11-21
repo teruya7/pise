@@ -211,10 +211,8 @@ class Submission():
                     os.chdir("../")
 
                 os.chdir("../../")
-                print()
             else:
                 print(f"No such directory: {path}")
-                print()
 
     #全てのtargetのdefectを対象にジョブを投げる
     def defect(self):

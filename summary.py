@@ -21,6 +21,10 @@ def check_analysis_alldone(list):
 class Summury():
     def __init__(self):
         piseset = PiseSet()
+
+        with open('symmetry_info.json') as f:
+            symmetry_info = json.load(f)
+
         for target in piseset.target_info:
             target_material = TargetHandler(target)
             path = target_material.make_path(piseset.functional)
@@ -36,6 +40,8 @@ class Summury():
                     
                         #summary_info.jsonを読み込み
                         summary_info = defaultdict(dict)
+
+                        summary_info["symmetry"] = symmetry_info[target_material.formula_pretty]
 
                         summary_info["formula_pretty"] = target_material.formula_pretty
                         summary_info["material_id"] = target_material.material_id
@@ -114,11 +120,9 @@ class Summury():
                     print(f"No such directory: analysis_info.json. So making summary will be skipped.")
 
                 os.chdir("../../")
-                print()
             else:
                 print(f"No such directory: {path}")
-                print()
         
 if __name__ == '__main__':
-    print()
+    pass
 

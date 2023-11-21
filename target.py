@@ -68,7 +68,9 @@ class Target():
                 symmetry_info = json.load(f)
         else:
             symmetry_info = defaultdict(dict)
+
         symmetry_info[material_id] = MPdatadict["symmetry"]
+
         with open("symmetry_info.json", "w") as f:
             json.dump(symmetry_info, f, indent=4)
 
@@ -101,7 +103,7 @@ class TargetHandler():
         return path
         
 if __name__ == '__main__':
-    print()
+    pass
 
 
 
