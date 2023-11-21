@@ -15,7 +15,7 @@ def submit_job(piseset, target):
         try:
             if int(num_jobs) >= int(piseset.limit_jobs):
                 print("The maximum number of calculations has been reached.")
-                return
+                return False
         except ValueError:
             pass
 
@@ -36,6 +36,21 @@ def submit_job(piseset, target):
         else:
             print("No ready_for_submission.txt")
         os.chdir("../")
+    return True
+
+def submit_jobs(path, piseset, calc_info_items):
+    if not os.path.isdir(path):
+        return
+    
+    os.chdir(path)
+    try:
+        for target, is_converged in calc_info_items:
+            if not is_converged:
+                if not submit_job(piseset, target):
+                    break
+    except KeyError:
+        pass
+    os.chdir("../")
 
 class Submission():
     def __init__(self):
@@ -54,71 +69,27 @@ class Submission():
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
                 
-                os.chdir("unitcell")
-                try:
-                    for target, is_converged in calc_info["unitcell"].items():
-                        if not is_converged:
-                            submit_job(self.piseset, target)
-                except KeyError:
-                    pass
-                os.chdir("../")
-
-                os.chdir("cpd")
-                try:
-                    for target, is_converged in calc_info["cpd"].items():
-                        if not is_converged:
-                            submit_job(self.piseset, target)
-                except KeyError:
-                    pass
-                os.chdir("../")
-
-                os.chdir("defect")
-                try:
-                    for target, is_converged in calc_info["defect"].items():
-                        if not is_converged:
-                            submit_job(self.piseset, target)
-                except KeyError:
-                    pass
-                os.chdir("../")
+                submit_jobs("unitcell", self.piseset, calc_info["unitcell"].items())
+                submit_jobs("cpd", self.piseset, calc_info["cpd"].items())
+                submit_jobs("defect", self.piseset, calc_info["defect"].items())
 
                 #表面の計算
                 if self.piseset.surface and os.path.isdir("surface"):
                     os.chdir("surface")
                     surface_list = make_dir_list()
                     for surface in surface_list:
-                        os.chdir(surface)
-                        try:
-                            for target, is_converged in calc_info["surface"][surface][target].items():
-                                if not is_converged:
-                                    submit_job(self.piseset, target)
-                        except KeyError:
-                            pass
-                        os.chdir("../")
+                        submit_jobs(surface, self.piseset, calc_info["surface"][surface][target].items())
                     os.chdir("../")
 
                 #ドーパントの計算
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()
                     for dopant in dopants:
-                        if os.path.isdir(f"dopant_{dopant}/cpd"):
-                            os.chdir(f"dopant_{dopant}/cpd")
-                            try:
-                                for target, is_converged in calc_info[f"dopant_{dopant}"]["cpd"].items():
-                                    if not is_converged:
-                                        submit_job(self.piseset, target)
-                            except KeyError:
-                                pass
-                            os.chdir("../../")
-
-                        if os.path.isdir(f"dopant_{dopant}/defect"):
-                            os.chdir(f"dopant_{dopant}/defect")
-                            try:
-                                for target, is_converged in calc_info[f"dopant_{dopant}"]["defect"].items():
-                                    if not is_converged:
-                                        submit_job(self.piseset, target)
-                            except KeyError:
-                                pass
-                            os.chdir("../../")
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
+                            submit_jobs("cpd", self.piseset, calc_info[f"dopant_{dopant}"]["cpd"].items())
+                            submit_jobs("defect", self.piseset, calc_info[f"dopant_{dopant}"]["defect"].items())
+                            os.chdir("../")
 
                 os.chdir("../../")
             else:
@@ -135,14 +106,7 @@ class Submission():
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
                 
-                os.chdir("unitcell")
-                try:
-                    for target, is_converged in calc_info["unitcell"].items():
-                        if not is_converged:
-                            submit_job(self.piseset, target)
-                except KeyError:
-                    pass
-                os.chdir("../")
+                submit_jobs("unitcell", self.piseset, calc_info["unitcell"].items())
 
                 os.chdir("../../")
             else:
@@ -159,27 +123,15 @@ class Submission():
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
                 
-                os.chdir("cpd")
-                try:
-                    for target, is_converged in calc_info["cpd"].items():
-                        if not is_converged:
-                            submit_job(self.piseset, target)
-                except KeyError:
-                    pass
-                os.chdir("../")
+                submit_jobs("cpd", self.piseset, calc_info["cpd"].items())
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()
                     for dopant in dopants:
-                        if os.path.isdir(f"dopant_{dopant}/cpd"):
-                            os.chdir(f"dopant_{dopant}/cpd")
-                            try:
-                                for target, is_converged in calc_info[f"dopant_{dopant}"]["cpd"].items():
-                                    if not is_converged:
-                                        submit_job(self.piseset, target)
-                            except KeyError:
-                                pass
-                            os.chdir("../../")
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
+                            submit_jobs("cpd", self.piseset, calc_info[f"dopant_{dopant}"]["cpd"].items())
+                            os.chdir("../")
 
                 os.chdir("../../")
             else:
@@ -196,18 +148,11 @@ class Submission():
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
 
-                if self.piseset.surface:
+                if self.piseset.surface and os.path.isdir("surface"):
                     os.chdir("surface")
                     surface_list = make_dir_list()
                     for surface in surface_list:
-                        os.chdir(surface)
-                        try:
-                            for target, is_converged in calc_info["surface"][surface][target].items():
-                                if not is_converged:
-                                    submit_job(self.piseset, target)
-                        except KeyError:
-                            pass
-                        os.chdir("../")
+                        submit_jobs(surface, self.piseset, calc_info["surface"][surface][target].items())
                     os.chdir("../")
 
                 os.chdir("../../")
@@ -225,27 +170,15 @@ class Submission():
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
                 
-                os.chdir("defect")
-                try:
-                    for target, is_converged in calc_info["defect"].items():
-                        if not is_converged:
-                            submit_job(self.piseset, target)
-                except KeyError:
-                    pass
-                os.chdir("../")
+                submit_jobs("defect", self.piseset, calc_info["defect"].items())
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()
                     for dopant in dopants:
-                        if os.path.isdir(f"dopant_{dopant}/defect"):
-                            os.chdir(f"dopant_{dopant}/defect")
-                            try:
-                                for target, is_converged in calc_info[f"dopant_{dopant}"]["defect"].items():
-                                    if not is_converged:
-                                        submit_job(self.piseset, target)
-                            except KeyError:
-                                pass
-                            os.chdir("../../")
+                        if os.path.isdir(f"dopant_{dopant}"):
+                            os.chdir(f"dopant_{dopant}")
+                            submit_jobs("defect", self.piseset, calc_info[f"dopant_{dopant}"]["defect"].items())
+                            os.chdir("../")
 
                 os.chdir("../../")
             else:

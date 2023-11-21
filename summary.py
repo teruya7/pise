@@ -45,7 +45,7 @@ class Summury():
                 #summary_info.jsonを読み込み
                 summary_info = defaultdict(dict)
 
-                summary_info["symmetry"] = symmetry_info[target_material.formula_pretty]
+                summary_info["symmetry"] = symmetry_info[target_material.material_id]
 
                 summary_info["formula_pretty"] = target_material.formula_pretty
                 summary_info["material_id"] = target_material.material_id
