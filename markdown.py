@@ -162,10 +162,8 @@ class Markdown():
                     markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = False
 
                 os.chdir("../../")
-                print()
             else:
                 print(f"No such directory: {path}")
-                print()
             
             #markdown_info.jsonの保存
             with open("markdown_info.json", "w") as f:
