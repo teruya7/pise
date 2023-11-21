@@ -8,7 +8,7 @@ from summary import Summury
 from markdown import Markdown
 from doping import Doping
 from calculation import Calculation
-from pinning_level import PinningLevel
+from database import Database
 
 Fire({
     "tar": Target,
@@ -19,6 +19,6 @@ Fire({
     "sum": Summury,
     "submit": Submission,
     "md": Markdown,
-    "dope": Doping,
-    "pl": PinningLevel
+    "dp": Doping,
+    "db": Database
     })

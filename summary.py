@@ -7,7 +7,7 @@ from pymatgen.io.vasp import Kpoints
 from pymatgen.io.vasp.outputs import Vasprun
 from pise_set import PiseSet
 from target import TargetHandler
-from analysis import get_label_from_chempotdiag
+from common_function import get_label_from_chempotdiag
 
 def check_analysis_alldone(list):
     for i in list:

@@ -1,7 +1,7 @@
 from target import TargetHandler
 from calculation import Calculation, make_dir_list
 from pise_set import PiseSet
-from cpd import delete_duplication, Database
+from database import Database
 import os
 from collections import defaultdict
 import json
@@ -11,6 +11,22 @@ import pathlib
 import yaml
 from pymatgen.io.vasp.outputs import Vasprun
 from hydrogen.hydrogen import get_local_extrema
+
+def delete_duplication(path_to_criteria, path_to_target):
+    #元のパスの記録
+    cwd = os.getcwd()
+    os.chdir(path_to_criteria)
+    criteria_list = make_dir_list()
+
+    os.chdir(cwd)
+    os.chdir(path_to_target)
+    target_list = make_dir_list()
+
+    for i in target_list:
+        if i in criteria_list:
+            subprocess.run([f"rm -r {i}"], shell=True)
+            print(f"{i} is duplication. So {i} has deleted.")
+    os.chdir(cwd)
 
 #ファイルのリストを作成
 def make_file_list():
@@ -253,7 +269,8 @@ def preparation_defect(piseset, calc_info, preparation_info):
     if os.path.isfile("supercell_info.json"):
         subprocess.run(["pydefect_vasp le -v ../unitcell/dos/repeat-*/AECCAR{0,2} -i all_electron_charge"], shell=True)
         subprocess.run(["pydefect_util ai --local_extrema volumetric_data_local_extrema.json -i 1 2"], shell=True)
-        subprocess.run(["pydefect ds"], shell=True)
+        if not os.path.isfile("defect_in.yaml"):
+            subprocess.run(["pydefect ds"], shell=True)
         subprocess.run(["pydefect_vasp de"], shell=True)
         
         #計算インプットの作成
@@ -439,9 +456,9 @@ def preparation_surface(piseset, calc_info, preparation_info):
         os.makedirs(identifier, exist_ok=True)
         subprocess.run([f"cp POSCAR.{identifier} {identifier}/POSCAR"], shell=True)
         if piseset.is_hybrid[piseset.functional]:
-            prepare_vasp_inputs(target, piseset.vise_task_command_surface, piseset.job_script_path, piseset.job_table["surface_hybrid"])
+            prepare_vasp_inputs(identifier, piseset.vise_task_command_surface, piseset.job_script_path, piseset.job_table["surface_hybrid"])
         else:
-            prepare_vasp_inputs(target, piseset.vise_task_command_surface, piseset.job_script_path, piseset.job_table["surface"])
+            prepare_vasp_inputs(identifier, piseset.vise_task_command_surface, piseset.job_script_path, piseset.job_table["surface"])
         os.chdir("../")
 
     #surface_info.jsonにデータを保存

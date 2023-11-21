@@ -10,6 +10,7 @@ def MPDataDoc_to_dict(MPDataDoc):
     formula_pretty = MPDataDoc.formula_pretty
     elements = MPDataDoc.elements
     composition_reduced = MPDataDoc.composition_reduced
+    symmetry = MPDataDoc.symmetry
 
     element_list = []
     for element in elements:
@@ -19,18 +20,21 @@ def MPDataDoc_to_dict(MPDataDoc):
     #MPdatadictを作成し、データを追加
     MPdatadict = defaultdict(dict)
     MPdatadict["material_id"] = material_id
+
     if "(" in formula_pretty:
         MPdatadict["formula_pretty"] = composition_reduced.alphabetical_formula.replace(" ", "")
     else:
         MPdatadict["formula_pretty"] = formula_pretty
+
     MPdatadict["elements"] = element_list
+    MPdatadict["symmetry"] = str(symmetry.symbol)
+
     return MPdatadict
 
 class Target():
     def __init__(self):
-        self.name = "target_info.json"
         #Materials projectから取得する値を指定
-        self.fields = ["material_id", "formula_pretty", "elements", "composition_reduced"]
+        self.fields = ["material_id", "formula_pretty", "elements", "composition_reduced", "symmetry"]
 
         #pise_defaults.yamからAPIキーを読み込む
         home = home = os.environ['HOME']
@@ -40,12 +44,12 @@ class Target():
             self.api_key = MY_API_KEY
         
         #target_info.jsonを読み込み
-        if os.path.isfile(self.name):
-            print(f"Loading {self.name}")
-            with open(self.name) as f:
+        if os.path.isfile("target_info.json"):
+            print("Loading target_info.json")
+            with open("target_info.json") as f:
                 target_info = json.load(f)
         else:
-            print(f"Making {self.name}")
+            print("Making target_info.json")
             target_info = []
         self.target_info = target_info
 
@@ -58,6 +62,17 @@ class Target():
         #MPDataDocをdictに変換
         MPdatadict = MPDataDoc_to_dict(MPDataDoc[0])
 
+        #symmetry情報をsymmetry_info.jsonに保存
+        if os.path.isfile("symmetry_info.json"):
+            with open('symmetry_info.json') as f:
+                symmetry_info = json.load(f)
+        else:
+            symmetry_info = defaultdict(dict)
+        symmetry_info[material_id] = MPdatadict["symmetry"]
+        with open("symmetry_info.json", "w") as f:
+            json.dump(symmetry_info, f, indent=4)
+
+
         #target_infoにデータを追加
         target_info = self.target_info
         if not MPdatadict in target_info:
@@ -66,7 +81,7 @@ class Target():
             print("This target has already been added.")
 
         #target_info.jsonにデータを保存
-        with open(self.name, "w") as f:
+        with open("target_info.json", "w") as f:
             json.dump(target_info, f, indent=4)
     
 class TargetHandler():
