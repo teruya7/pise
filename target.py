@@ -23,6 +23,7 @@ def MPDataDoc_to_dict(MPDataDoc):
 
     if "(" in formula_pretty:
         MPdatadict["formula_pretty"] = composition_reduced.alphabetical_formula.replace(" ", "")
+        MPdatadict["name"] = formula_pretty
     else:
         MPdatadict["formula_pretty"] = formula_pretty
 

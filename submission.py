@@ -3,7 +3,6 @@ import subprocess
 from common_function import make_dir_list
 from pise_set import PiseSet
 from target import TargetHandler
-import yaml
 import json
 from doping import get_dopants_list
 from calculation import Calculation
@@ -43,13 +42,10 @@ def submit_jobs(path, piseset, calc_info_items):
         return
     
     os.chdir(path)
-    try:
-        for target, is_converged in calc_info_items:
-            if not is_converged:
-                if not submit_job(piseset, target):
-                    break
-    except KeyError:
-        pass
+    for target, is_converged in calc_info_items:
+        if not is_converged:
+            if not submit_job(piseset, target):
+                break
     os.chdir("../")
 
 class Submission():
@@ -68,17 +64,28 @@ class Submission():
 
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
-                
-                submit_jobs("unitcell", self.piseset, calc_info["unitcell"].items())
-                submit_jobs("cpd", self.piseset, calc_info["cpd"].items())
-                submit_jobs("defect", self.piseset, calc_info["defect"].items())
+                try:
+                    submit_jobs("unitcell", self.piseset, calc_info["unitcell"].items())
+                except KeyError:
+                    pass
+                try:
+                    submit_jobs("cpd", self.piseset, calc_info["cpd"].items())
+                except KeyError:
+                    pass
+                try:
+                    submit_jobs("defect", self.piseset, calc_info["defect"].items())
+                except KeyError:
+                    pass
 
                 #表面の計算
                 if self.piseset.surface and os.path.isdir("surface"):
                     os.chdir("surface")
                     surface_list = make_dir_list()
                     for surface in surface_list:
-                        submit_jobs(surface, self.piseset, calc_info["surface"][surface][target].items())
+                        try:
+                            submit_jobs(surface, self.piseset, calc_info["surface"][surface][target].items())
+                        except KeyError:
+                            pass
                     os.chdir("../")
 
                 #ドーパントの計算
@@ -87,8 +94,14 @@ class Submission():
                     for dopant in dopants:
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
-                            submit_jobs("cpd", self.piseset, calc_info[f"dopant_{dopant}"]["cpd"].items())
-                            submit_jobs("defect", self.piseset, calc_info[f"dopant_{dopant}"]["defect"].items())
+                            try:
+                                submit_jobs("cpd", self.piseset, calc_info[f"dopant_{dopant}"]["cpd"].items())
+                            except KeyError:
+                                pass
+                            try:
+                                submit_jobs("defect", self.piseset, calc_info[f"dopant_{dopant}"]["defect"].items())
+                            except KeyError:
+                                pass
                             os.chdir("../")
 
                 os.chdir("../../")
@@ -105,8 +118,10 @@ class Submission():
 
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
-                
-                submit_jobs("unitcell", self.piseset, calc_info["unitcell"].items())
+                try:
+                    submit_jobs("unitcell", self.piseset, calc_info["unitcell"].items())
+                except KeyError:
+                    pass
 
                 os.chdir("../../")
             else:
@@ -123,14 +138,20 @@ class Submission():
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
                 
-                submit_jobs("cpd", self.piseset, calc_info["cpd"].items())
+                try:
+                    submit_jobs("cpd", self.piseset, calc_info["cpd"].items())
+                except KeyError:
+                    pass
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()
                     for dopant in dopants:
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
-                            submit_jobs("cpd", self.piseset, calc_info[f"dopant_{dopant}"]["cpd"].items())
+                            try:
+                                submit_jobs("cpd", self.piseset, calc_info[f"dopant_{dopant}"]["cpd"].items())
+                            except KeyError:
+                                pass
                             os.chdir("../")
 
                 os.chdir("../../")
@@ -152,7 +173,10 @@ class Submission():
                     os.chdir("surface")
                     surface_list = make_dir_list()
                     for surface in surface_list:
-                        submit_jobs(surface, self.piseset, calc_info["surface"][surface][target].items())
+                        try:
+                            submit_jobs(surface, self.piseset, calc_info["surface"][surface][target].items())
+                        except KeyError:
+                            pass
                     os.chdir("../")
 
                 os.chdir("../../")
@@ -170,7 +194,11 @@ class Submission():
                 with open('calc_info.json') as f:
                     calc_info = json.load(f)
                 
-                submit_jobs("defect", self.piseset, calc_info["defect"].items())
+                try:
+                    submit_jobs("defect", self.piseset, calc_info["defect"].items())
+                except KeyError:
+                    pass
+
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()

@@ -13,6 +13,15 @@ from calculation import Calculation
 from doping import get_dopants_list
 from surface import plot_band_alignment, calculation_surface_energy, plot_averaged_locpot
 from common_function import get_label_from_chempotdiag
+from pydefect.chem_pot_diag.chem_pot_diag import RelativeEnergies, ChemPotDiagMaker
+
+def make_cpd_and_vertices(path_to_relative_energy_yaml, target, elements_list=None):
+    rel_energies = RelativeEnergies.from_yaml(path_to_relative_energy_yaml)
+    elements = elements_list or Composition(target).chemical_system.split("-")
+    cpd_maker = ChemPotDiagMaker(rel_energies, elements, target)
+    cpd = cpd_maker.chem_pot_diag
+    cpd.to_json_file()
+    cpd.to_target_vertices.to_yaml_file()
 
 #unstable_errorに対処し、target_vertices.yamlを作成する
 def avoid_unstable_error(flag, target_material, dopant=None):
@@ -36,23 +45,26 @@ def avoid_unstable_error(flag, target_material, dopant=None):
 
             with open("relative_energies.yaml", 'w') as file:
                 yaml.dump(relative_energies, file)
-                
+
             if dopant is not None:
                 pydefect_cv_dopant(target_material, dopant)
             else:
-                subprocess.run([f"pydefect cv -t {target}"], shell=True)
+                if hasattr(target_material, "name"):
+                    make_cpd_and_vertices("relative_energies.yaml", target_material.name)
+                else:
+                    make_cpd_and_vertices("relative_energies.yaml", target_material.formula_pretty)
 
         if os.path.isfile("target_vertices.yaml"):
             flag = True
 
 def pydefect_cv_dopant(target_material, dopant):
     elements = target_material.elements
-    if len(elements) == 2:
-        subprocess.run([f"pydefect cv -t {target_material.formula_pretty} -e {elements[0]} {elements[1]} {dopant}"], shell=True)
-    elif len(elements) == 3:
-        subprocess.run([f"pydefect cv -t {target_material.formula_pretty} -e {elements[0]} {elements[1]} {elements[2]} {dopant}"], shell=True)
-    elif len(elements) == 4:
-        subprocess.run([f"pydefect cv -t {target_material.formula_pretty} -e {elements[0]} {elements[1]} {elements[2]} {elements[3]} {dopant}"], shell=True)
+    elements.append(dopant)
+
+    if hasattr(target_material, "name"):
+        make_cpd_and_vertices("relative_energies.yaml", target_material.name, elements)
+    else:
+        make_cpd_and_vertices("relative_energies.yaml", target_material.formula_pretty, elements)
 
 def reduced_cpd(dopant):
     #label作成用のアルファベットのリスト
@@ -230,27 +242,27 @@ def analysis_cpd(target_material, piseset, calc_info, analysis_info):
         return True
 
     #データベースからデータを取得
-    if piseset.cpd_database:
-        if os.path.isfile('cpd/competing_phases_info.json'):
-            with open('cpd/competing_phases_info.json') as f:
-                competing_phases_info = json.load(f)
-            for competing_phase in competing_phases_info["competing_phases"]:
-                try:
-                    if calc_info["cpd"][competing_phase]:
-                        pass
-                    else:
-                        subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
-                        if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
-                            calc_info["cpd"][competing_phase] = True
-                except KeyError:
+    if os.path.isfile('cpd/competing_phases_info.json'):
+        with open('cpd/competing_phases_info.json') as f:
+            competing_phases_info = json.load(f)
+        for competing_phase in competing_phases_info["competing_phases"]:
+            try:
+                if calc_info["cpd"][competing_phase]:
+                    pass
+                else:
                     subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
                     if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
                         calc_info["cpd"][competing_phase] = True
-            
-            with open("calc_info.json", "w") as f:
-                json.dump(calc_info, f, indent=4)
-        else:
-            return False
+            except KeyError:
+                subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
+                if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
+                    calc_info["cpd"][competing_phase] = True
+        
+        with open("calc_info.json", "w") as f:
+            json.dump(calc_info, f, indent=4)
+    else:
+        print("No such file: competing_phases_info.json")
+        return False
     
     #cpdの計算が完了しているか確認
     try:
@@ -271,9 +283,9 @@ def analysis_cpd(target_material, piseset, calc_info, analysis_info):
         subprocess.run(["pydefect sre"], shell=True)
     if not os.path.isfile("target_vertices.yaml"):
         if hasattr(target_material, "name"):
-            subprocess.run([f"pydefect cv -t {target_material.name}"], shell=True)
+            make_cpd_and_vertices("relative_energies.yaml", target_material.name)
         else:
-            subprocess.run([f"pydefect cv -t {target_material.formula_pretty}"], shell=True)
+            make_cpd_and_vertices("relative_energies.yaml", target_material.formula_pretty)
     flag = check_analysis_done("target_vertices.yaml")
     
     avoid_unstable_error(flag, target_material)
