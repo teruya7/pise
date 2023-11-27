@@ -16,6 +16,7 @@ class PiseSet():
             self.job_script_path = pise_defaults["job_script_path"]
             self.path_to_tsubo = pise_defaults["path_to_tsubo"]
             self.path_to_cpd_database = pise_defaults["path_to_cpd_database"]
+            self.path_to_target_summary = pise_defaults["path_to_target_summary"]
 
             self.job_table = pise_defaults["job_table"]
 
@@ -68,13 +69,15 @@ class PiseSet():
             self.abs = pise["abs"]
             self.surface = pise["surface"]
             self.hydrogen = pise["hydrogen"]
-            self.cpd_database = pise["cpd_database"]
             self.path_to_poscar = pise["path_to_poscar"]
 
         #target_info.jsonを読み込み
-        with open("target_info.json") as f:
-            target_info = json.load(f)
-            self.target_info = target_info
+        if os.path.isfile("target_info.json"):
+            with open("target_info.json") as f:
+                target_info = json.load(f)
+                self.target_info = target_info
+        else:
+            print("No such file: target_info.json")
         
 if __name__ == '__main__':
     pass

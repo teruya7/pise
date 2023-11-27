@@ -3,6 +3,7 @@ import yaml
 import os
 import json
 from collections import defaultdict
+from pise_set import PiseSet
 
 def MPDataDoc_to_dict(MPDataDoc):
     #MPDataDocのデータの読み込み
@@ -34,6 +35,7 @@ def MPDataDoc_to_dict(MPDataDoc):
 
 class Target():
     def __init__(self):
+        self.piseset = PiseSet()
         #Materials projectから取得する値を指定
         self.fields = ["material_id", "formula_pretty", "elements", "composition_reduced", "symmetry"]
 
@@ -54,6 +56,14 @@ class Target():
             target_info = []
         self.target_info = target_info
 
+        #target_summary_info.jsonで計算対象物質を一元管理し、重複をなくす
+        if os.path.isfile(f"{self.piseset.path_to_target_summary}/target_summary_info.json"):
+            with open(f"{self.piseset.path_to_target_summary}/target_summary_info.json") as f:
+                target_summary_info = json.load(f)
+        else:
+            target_summary_info = defaultdict(dict)
+        self.target_summary_info = target_summary_info
+
 
     def add(self, material_id):
         #Materials projectからデータを取得
@@ -69,23 +79,36 @@ class Target():
                 symmetry_info = json.load(f)
         else:
             symmetry_info = defaultdict(dict)
-
         symmetry_info[material_id] = MPdatadict["symmetry"]
-
         with open("symmetry_info.json", "w") as f:
             json.dump(symmetry_info, f, indent=4)
 
 
         #target_infoにデータを追加
         target_info = self.target_info
-        if not MPdatadict in target_info:
+        target_summary_info = self.target_summary_info
+        material_id = MPdatadict["material_id"]
+        formula_pretty = MPdatadict["formula_pretty"]
+        
+        try:
+            if not material_id in target_summary_info.keys():
+                target_summary_info[material_id] = formula_pretty
+                target_info.append(MPdatadict)
+            else:
+                print("This target has already been considered.")
+        except KeyError:
+            target_summary_info[material_id] = formula_pretty
             target_info.append(MPdatadict)
-        else:
-            print("This target has already been added.")
 
         #target_info.jsonにデータを保存
         with open("target_info.json", "w") as f:
             json.dump(target_info, f, indent=4)
+        
+        with open(f"{self.piseset.path_to_target_summary}/target_summary_info.json", "w") as f:
+            json.dump(target_summary_info, f, indent=4)
+    
+    def query(self):
+        pass
     
 class TargetHandler():
     def __init__(self, target):

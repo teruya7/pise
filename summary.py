@@ -33,14 +33,16 @@ class Summury():
 
                 if not os.path.isfile("analysis_info.json"):
                     print(f"No such directory: analysis_info.json. So making summary will be skipped.")
-                    return
+                    os.chdir("../../")
+                    continue
                 
                 with open('analysis_info.json') as f:
                     analysis_info = json.load(f)
 
                 if not check_analysis_alldone(analysis_info.values()):
                     print("Analysis has not completed yet. So making summary will be skipped.")
-                    return
+                    os.chdir("../../")
+                    continue
 
                 #summary_info.jsonを読み込み
                 summary_info = defaultdict(dict)

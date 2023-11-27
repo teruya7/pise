@@ -13,58 +13,32 @@ from calculation import Calculation
 from doping import get_dopants_list
 from surface import plot_band_alignment, calculation_surface_energy, plot_averaged_locpot
 from common_function import get_label_from_chempotdiag
-from pydefect.chem_pot_diag.chem_pot_diag import RelativeEnergies, ChemPotDiagMaker
+from pydefect.chem_pot_diag.chem_pot_diag import RelativeEnergies, ChemPotDiagMaker, UnstableTargetError
 
-def make_cpd_and_vertices(path_to_relative_energy_yaml, target, elements_list=None):
-    rel_energies = RelativeEnergies.from_yaml(path_to_relative_energy_yaml)
+def make_cpd_and_vertices(target, elements_list):
+    rel_energies = RelativeEnergies.from_yaml("relative_energies.yaml")
     elements = elements_list or Composition(target).chemical_system.split("-")
     cpd_maker = ChemPotDiagMaker(rel_energies, elements, target)
-    cpd = cpd_maker.chem_pot_diag
-    cpd.to_json_file()
-    cpd.to_target_vertices.to_yaml_file()
+    try:
+        cpd = cpd_maker.chem_pot_diag
+        cpd.to_json_file()
+        cpd.to_target_vertices.to_yaml_file()
+    except UnstableTargetError:
+        avoid_unstable_error(target, elements_list)
 
-#unstable_errorに対処し、target_vertices.yamlを作成する
-def avoid_unstable_error(flag, target_material, dopant=None):
-    while not flag:
-        if not os.path.isfile("unstable_error.txt"):
-            subprocess.run(["touch unstable_error.txt"], shell=True)
+def avoid_unstable_error(target, elements_list):
+    if not os.path.isfile("unstable_error.txt"):
+        subprocess.run(["touch unstable_error.txt"], shell=True)
 
-        with open("relative_energies.yaml") as file:
-            relative_energies = yaml.safe_load(file)
+    with open("relative_energies.yaml") as file:
+        relative_energies = yaml.safe_load(file)
+    
+    relative_energies[target] -= 0.01
 
-            if hasattr(target_material, "name"):
-                target = target_material.name
-                relative_energies[target] -= 0.01
-            else:
-                try:
-                    target = target_material.formula_pretty
-                    relative_energies[target] -= 0.01
-                except (KeyError, ValueError):
-                    print(f"Target {target} is not in relative energy compounds, so stop here.")
-                    break
-
-            with open("relative_energies.yaml", 'w') as file:
-                yaml.dump(relative_energies, file)
-
-            if dopant is not None:
-                pydefect_cv_dopant(target_material, dopant)
-            else:
-                if hasattr(target_material, "name"):
-                    make_cpd_and_vertices("relative_energies.yaml", target_material.name)
-                else:
-                    make_cpd_and_vertices("relative_energies.yaml", target_material.formula_pretty)
-
-        if os.path.isfile("target_vertices.yaml"):
-            flag = True
-
-def pydefect_cv_dopant(target_material, dopant):
-    elements = target_material.elements
-    elements.append(dopant)
-
-    if hasattr(target_material, "name"):
-        make_cpd_and_vertices("relative_energies.yaml", target_material.name, elements)
-    else:
-        make_cpd_and_vertices("relative_energies.yaml", target_material.formula_pretty, elements)
+    with open("relative_energies.yaml", 'w') as file:
+        yaml.dump(relative_energies, file)
+    
+    make_cpd_and_vertices(target, elements_list)
 
 def reduced_cpd(dopant):
     #label作成用のアルファベットのリスト
@@ -283,12 +257,9 @@ def analysis_cpd(target_material, piseset, calc_info, analysis_info):
         subprocess.run(["pydefect sre"], shell=True)
     if not os.path.isfile("target_vertices.yaml"):
         if hasattr(target_material, "name"):
-            make_cpd_and_vertices("relative_energies.yaml", target_material.name)
+            make_cpd_and_vertices(target_material.name, target_material.elements)
         else:
-            make_cpd_and_vertices("relative_energies.yaml", target_material.formula_pretty)
-    flag = check_analysis_done("target_vertices.yaml")
-    
-    avoid_unstable_error(flag, target_material)
+            make_cpd_and_vertices(target_material.formula_pretty, target_material.elements)
     flag = check_analysis_done("target_vertices.yaml")
 
     #cpd.pdfを作成し、pngとして保存する
@@ -362,27 +333,25 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, pises
         return False
 
     #データベースからデータを取得
-    if piseset.cpd_database:
-        if os.path.isfile(f'dopant_{dopant}/cpd/competing_phases_info.json'):
-            with open(f'dopant_{dopant}/cpd/competing_phases_info.json') as f:
-                competing_phases_info = json.load(f)
-            for competing_phase in competing_phases_info["competing_phases"]:
-                try:
-                    if calc_info[f"dopant_{dopant}"]["cpd"][competing_phase]: #既にデータがある場合
-                        pass
-                    else: #データはあるが計算が完了しておらず、データベースからデータを取得したい場合
-                        subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
-                        if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
-                            calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
-                except KeyError: #まだデータベースからデータを取得していない場合
+    if os.path.isfile(f'dopant_{dopant}/cpd/competing_phases_info.json'):
+        with open(f'dopant_{dopant}/cpd/competing_phases_info.json') as f:
+            competing_phases_info = json.load(f)
+        for competing_phase in competing_phases_info["competing_phases"]:
+            try:
+                if calc_info[f"dopant_{dopant}"]["cpd"][competing_phase]: #既にデータがある場合
+                    pass
+                else: #データはあるが計算が完了しておらず、データベースからデータを取得したい場合
                     subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
                     if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
                         calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
-            
-            with open("calc_info.json", "w") as f:
-                json.dump(calc_info, f, indent=4)
-        else:
-            return False
+            except KeyError: #まだデータベースからデータを取得していない場合
+                subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
+                if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
+                    calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
+        
+        with open("calc_info.json", "w") as f:
+            json.dump(calc_info, f, indent=4)
+
 
     #dopantのcpdの計算が完了しているか確認
     try:
@@ -410,10 +379,13 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, pises
     if not os.path.isfile("relative_energies.yaml"):
         subprocess.run(["pydefect sre"], shell=True)
     if not os.path.isfile("target_vertices.yaml"):
-        pydefect_cv_dopant(target_material, dopant)
+        elements = target_material.elements
+        elements.append(dopant)
+        if hasattr(target_material, "name"):
+            make_cpd_and_vertices(target_material.name, elements)
+        else:
+            make_cpd_and_vertices(target_material.formula_pretty, elements)
     flag = check_analysis_done("target_vertices.yaml")
-
-    avoid_unstable_error(flag, target_material, dopant)
     
     #target_verticesを修正する（pydefectにエラーがある）
     reduced_cpd(dopant)
