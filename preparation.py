@@ -260,7 +260,7 @@ def preparation_defect(piseset, calc_info, preparation_info):
     print("Preparing defect.")
     os.makedirs("defect", exist_ok=True)
     os.chdir("defect")
-    subprocess.run(["pydefect s -p ../unitcell/dos/POSCAR-finish"], shell=True)
+    subprocess.run(["pydefect s -p ../unitcell/dos/POSCAR-finish --max_atoms 200"], shell=True)
 
     if os.path.isfile("supercell_info.json"):
         subprocess.run(["pydefect_vasp le -v ../unitcell/dos/repeat-*/AECCAR{0,2} -i all_electron_charge"], shell=True)

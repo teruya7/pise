@@ -2,6 +2,7 @@ from mp_api.client import MPRester
 import yaml
 import os
 import json
+import pandas as pd
 from collections import defaultdict
 from pise_set import PiseSet
 
@@ -107,8 +108,37 @@ class Target():
         with open(f"{self.piseset.path_to_target_summary}/target_summary_info.json", "w") as f:
             json.dump(target_summary_info, f, indent=4)
     
+    #ある条件を満たす物質を一気にダウンロードしたいとき
     def query(self):
-        pass
+        chemsys = ["*-*-F"]
+        band_gap=[2,10]
+        num_elements=[3,3]
+        num_sites=[0,4]
+        total_magnetization=[0,0]
+        energy_above_hull=[0,0]
+        exclude_elements = ["Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Ac","Th","Pa","U","Np","Pu"]
+        
+        with MPRester(self.api_key) as mpr:
+            MPDataDoc = mpr.summary.search(band_gap=band_gap,
+                                           num_elements=num_elements,
+                                           num_sites=num_sites,
+                                           total_magnetization=total_magnetization,
+                                           chemsys=chemsys,
+                                           energy_above_hull=energy_above_hull,
+                                           exclude_elements=exclude_elements,
+                                           theoretical=False,
+                                           is_stable=True,
+                                           fields=self.fields)
+        MPDatadf = pd.DataFrame(columns=self.fields)
+        for mpdatadoc in MPDataDoc:
+            mpdatadict = MPDataDoc_to_dict(mpdatadoc)
+            mpdatadf = pd.read_json(mpdatadict)
+            MPDatadf.append(mpdatadf)
+        
+        print(MPDatadf.head())
+
+        with open("target_info.json", "w") as f:
+            json.dump(MPDatadf.to_json(), f, indent=4)
     
 class TargetHandler():
     def __init__(self, target):
