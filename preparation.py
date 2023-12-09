@@ -15,6 +15,7 @@ from hydrogen.hydrogen import get_local_extrema
 def remove_from_competing_phases(target, competing_phases_list):
     try:
         competing_phases_list.remove(target)
+        subprocess.run([f"rm -r {target}"], shell=True)
     except ValueError:
         pass
 
@@ -224,6 +225,9 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
     remove_from_competing_phases("host", competing_phases_list)
     remove_from_competing_phases(f"{target_material.formula_pretty}_{target_material.material_id}", competing_phases_list)
     remove_from_competing_phases("Sc39N34_mp-685209", competing_phases_list)
+    remove_from_competing_phases("F2_mp-1067793", competing_phases_list)
+    remove_from_competing_phases("B2S3_mp-1199451", competing_phases_list)
+    remove_from_competing_phases("Sb2S19F12_mp-723419", competing_phases_list)
 
     #competing_phases_info.jsonの保存
     competing_phases_dict = defaultdict(dict)
@@ -314,6 +318,9 @@ def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, targ
     remove_from_competing_phases("host", competing_phases_list)
     remove_from_competing_phases(f"{target_material.formula_pretty}_{target_material.material_id}", competing_phases_list)
     remove_from_competing_phases("Sc39N34_mp-685209", competing_phases_list)
+    remove_from_competing_phases("F2_mp-1067793", competing_phases_list)
+    remove_from_competing_phases("B2S3_mp-1199451", competing_phases_list)
+    remove_from_competing_phases("Sb2S19F12_mp-723419", competing_phases_list)
 
     #competing_phases_info.jsonの保存
     competing_phases_dict = defaultdict(dict)

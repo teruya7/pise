@@ -130,11 +130,11 @@ def change_name(former_name, later_name):
 
 def plot_energy_diagram(labels):
     for label in labels:
-        subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label}"], shell=True)
+        subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
         change_name(f"energy_{label}.pdf", f"energy_{label}_default.pdf")
         change_name(f"energy_{label}.png", f"energy_{label}_default.png")
         
-        subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label}"], shell=True)
+        subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
         change_name(f"energy_{label}.pdf", f"energy_{label}_-5_5.pdf")
         change_name(f"energy_{label}.png", f"energy_{label}_-5_5.png")
 

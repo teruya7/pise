@@ -6,7 +6,7 @@ from collections import defaultdict
 from doping import get_dopants_list
 
 
-def make_base_markdown(piseset, summary_info):
+def make_base_markdown(piseset, summary_info, symmetry):
 
     if piseset.functional == "pbesol":
         band = "band_nsc"
@@ -87,7 +87,7 @@ def make_base_markdown(piseset, summary_info):
                                     poscar_b = summary_info["POSCAR"]["b"],
                                     poscar_c = summary_info["POSCAR"]["c"],
                                     poscar_n_atoms = summary_info["POSCAR"]["n_atoms"],
-                                    symmetry = summary_info["symmetry"],
+                                    symmetry = symmetry,
                                     band_gap = summary_info["band_gap"],
                                     vbm = summary_info["vbm"],
                                     cbm = summary_info["cbm"],
@@ -133,7 +133,12 @@ class Markdown():
                     with open('summary_info.json') as f:
                         summary_info = json.load(f)
 
-                    summary = make_base_markdown(piseset, summary_info)
+                    if target_material.material_id != "None":
+                        symmetry = summary_info["symmetry"]
+                    else:
+                        symmetry = "None"
+
+                    summary = make_base_markdown(piseset, summary_info, symmetry)
                     with open(f"{target_material.formula_pretty}_{target_material.material_id}_{summary_info['functional']}.md", mode='w') as f:
                         f.write(f"{summary}\n")
                         for label in summary_info["labels"]:
