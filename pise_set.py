@@ -65,11 +65,13 @@ class PiseSet():
             pise = yaml.safe_load(file)
             self.functional = pise["functional"]
             self.nsc = pise["nsc"]
-            self.aexx = pise["aexx"]
             self.abs = pise["abs"]
             self.surface = pise["surface"]
             self.hydrogen = pise["hydrogen"]
             self.path_to_poscar = pise["path_to_poscar"]
+            self.sc_dd_hybrid = pise["sc_dd_hybrid"]
+            if not self.sc_dd_hybrid:
+                self.aexx = pise["aexx"]
 
         #target_info.jsonを読み込み
         if os.path.isfile("target_info.json"):

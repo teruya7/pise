@@ -211,32 +211,35 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
 
 def analysis_cpd(target_material, piseset, calc_info, analysis_info):
     #cpdが解析済みかどうか確認
+    if calc_info["unitcell"]["opt"]:
+        print("opt calculation has not finished yet.")
+        return True
+    
+    #optの計算が終わっているかどうか確認
     if analysis_info["cpd"]:
-        print("Analysis of cpd has already finished.")
+        print("Analysis of cpd has already finished. So analysis of cpd will be skipped.")
         return True
 
     #データベースからデータを取得
-    if os.path.isfile('cpd/competing_phases_info.json'):
-        with open('cpd/competing_phases_info.json') as f:
-            competing_phases_info = json.load(f)
-        for competing_phase in competing_phases_info["competing_phases"]:
-            try:
-                if calc_info["cpd"][competing_phase]:
-                    pass
-                else:
+    if not piseset.is_hybrid[piseset.functional]:
+        if os.path.isfile('cpd/competing_phases_info.json'):
+            with open('cpd/competing_phases_info.json') as f:
+                competing_phases_info = json.load(f)
+            for competing_phase in competing_phases_info["competing_phases"]:
+                try:
+                    if calc_info["cpd"][competing_phase]:
+                        pass
+                    else:
+                        subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
+                        if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
+                            calc_info["cpd"][competing_phase] = True
+                except KeyError:
                     subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
                     if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
                         calc_info["cpd"][competing_phase] = True
-            except KeyError:
-                subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} cpd/"], shell=True)
-                if os.path.isfile(f"cpd/{competing_phase}/is_converged.txt"):
-                    calc_info["cpd"][competing_phase] = True
-        
-        with open("calc_info.json", "w") as f:
-            json.dump(calc_info, f, indent=4)
-    else:
-        print("No such file: competing_phases_info.json")
-        return False
+            
+            with open("calc_info.json", "w") as f:
+                json.dump(calc_info, f, indent=4)
     
     #cpdの計算が完了しているか確認
     try:

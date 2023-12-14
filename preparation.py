@@ -48,7 +48,7 @@ def calc_aexx(vasprun_path):
     vasprun = Vasprun(vasprun_path)
     epsilon_electronic = vasprun.epsilon_static
     AEXX = 1/((epsilon_electronic[0][0] + epsilon_electronic[1][1] + epsilon_electronic[2][2])/3)
-    AEXX_formatted = '{:.2g}'.format(AEXX)
+    AEXX_formatted = '{:.3g}'.format(AEXX)
     return AEXX_formatted
 
 def load_preparetion_info():
@@ -93,7 +93,7 @@ def preparation_opt(piseset, material_id, formula_pretty):
         #vise.yamlの作成
         vise_yaml = piseset.vise_yaml
         vise_yaml["xc"] = functional
-        if piseset.is_hybrid[functional]:
+        if piseset.is_hybrid[functional] and not piseset.sc_dd_hybrid:
             vise_yaml["user_incar_settings"].setdefault("AEXX", piseset.aexx)
         with open("vise.yaml", "w") as f:
             yaml.dump(vise_yaml, f, sort_keys=False)
@@ -116,7 +116,74 @@ def preparation_opt(piseset, material_id, formula_pretty):
                 else:
                     prepare_job_script(piseset.job_script_path, piseset.job_table["opt"])
                 subprocess.run([piseset.vise_task_command_opt], shell=True)
+
+def preparation_unitcell_sc_dd_hybrid(piseset, calc_info, preparation_info):
+    if preparation_info["unitcell"]:
+        print("Preparation of unitcell_sc-dd-hybrid has already finished.")
+        return True
+
+    #optの計算が完了しているか確認
+    if not calc_info["unitcell"]["opt"]:
+        print("opt calculations have not finished yet. So preparing unitcell_sc-dd-hybrid will be skipped.")
+        return False
+    
+    print("Preparing unitcell_sc-dd-hybrid.")
+    os.chdir("unitcell")
+    
+    if calc_info["unitcell"]["opt"] and not os.path.isdir("dielectric"):
+        prepare_vasp_inputs("dielectric", piseset.vise_task_command_dielectric_hybrid, piseset.job_script_path, piseset.job_table["dielectric_hybrid"])
+        os.chdir("../")
+        return False
+
+    #dielectricの計算が完了しているか確認
+    if not calc_info["unitcell"]["dielectric"]:
+        print("dielectric calculations have not finished yet. So preparing unitcell_sc-dd-hybrid will be skipped.")
+        os.chdir("../")
+        return False
+    
+    if calc_info["unitcell"]["dielectric"]:
+        #former_aexxを求める
+        if os.path.isfile("sc_dd_hybrid_aexx.json"):
+            with open('sc_dd_hybrid_aexx.json') as f:
+                sc_dd_hybrid_aexx = json.load(f)
+                former_aexx = sc_dd_hybrid_aexx[max(sc_dd_hybrid_aexx)]
+        else:
+            former_aexx = 0.25
+        
+        #aexxを求める
+        aexx = calc_aexx("dielectric/vasprun.xml")
+
+        #former_aexxとaexxの差を比較する とりあえず0.05より小さければ収束したとみなす
+        if abs(former_aexx - aexx) < 0.05:
+            print("aexx has converged.")
+            prepare_vasp_inputs("band", piseset.vise_task_command_band, piseset.job_script_path, piseset.job_table["band_hybrid"])
+            prepare_vasp_inputs("dos", piseset.vise_task_command_dos, piseset.job_script_path, piseset.job_table["dos_hybrid"])
+            os.chdir("../")
+            return True
+        else:
+            print("aexx has not converged yet.")
+
+            #vise.yamlのaexxを更新
+            with open("../vise.yaml") as file:
+                vise_yaml = yaml.safe_load(file)
+            vise_yaml["user_incar_settings"].setdefault("AEXX", aexx)
+            with open("../vise.yaml", 'w') as file:
+                yaml.dump(vise_yaml, file)
             
+            sc_dd_hybrid_aexx[max(sc_dd_hybrid_aexx)+1] = aexx
+
+            with open("sc_dd_hybrid_aexx.json", "w") as f:
+                json.dump(sc_dd_hybrid_aexx, f, indent=4)
+
+            subprocess.run([f"mv opt opt_{former_aexx}"], shell=True)
+            subprocess.run([f"mv dielectric dielectric_{former_aexx}"], shell=True)
+
+            os.makedirs("opt", exist_ok=True)
+            os.chdir("opt")
+            prepare_job_script(piseset.job_script_path, piseset.job_table["opt_hybrid"])
+            os.chdir("../../")
+            return False
+
 def preparation_unitcell(piseset, calc_info, preparation_info):
     #unitcellが準備済みか確認
     if preparation_info["unitcell"]:
@@ -228,6 +295,7 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
     remove_from_competing_phases("F2_mp-1067793", competing_phases_list)
     remove_from_competing_phases("B2S3_mp-1199451", competing_phases_list)
     remove_from_competing_phases("Sb2S19F12_mp-723419", competing_phases_list)
+    remove_from_competing_phases("CaMg149_mp-1184449", competing_phases_list)
 
     #competing_phases_info.jsonの保存
     competing_phases_dict = defaultdict(dict)
@@ -235,17 +303,18 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
     with open("competing_phases_info.json", "w") as f:
         json.dump(competing_phases_dict, f, indent=4)
 
-    #計算インプットの作成
-    for target_dir in competing_phases_list:
-        if target_dir not in cpd_database.datalist:
-            if piseset.is_hybrid[piseset.functional]:
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
-            else:
+    #sc-dd-hybridだとaexxが違うからデータベースを作りにくい
+    if piseset.is_hybrid[piseset.functional]:
+        for target_dir in competing_phases_list:
+            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+    else:
+        for target_dir in competing_phases_list:
+            if target_dir not in cpd_database.datalist:
                 prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
-            subprocess.run([f"cp -r {target_dir} {piseset.path_to_cpd_database}/{piseset.functional}/"], shell=True)
-            print(f"{target_dir} has been added to the database.")
-        else:
-            print(f"{target_dir} has already existed in the database.")
+                subprocess.run([f"cp -r {target_dir} {piseset.path_to_cpd_database}/{piseset.functional}/"], shell=True)
+                print(f"{target_dir} has been added to the database.")
+            else:
+                print(f"{target_dir} has already existed in the database.")
 
     os.chdir("../")
 
@@ -328,17 +397,17 @@ def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, targ
     with open("competing_phases_info.json", "w") as f:
         json.dump(competing_phases_dict, f, indent=4)
 
-    #計算インプットの作成
-    for target_dir in competing_phases_list:
-        if target_dir not in cpd_database.datalist:
-            if piseset.is_hybrid[piseset.functional]:
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
-            else:
+    if piseset.is_hybrid[piseset.functional]:
+        for target_dir in competing_phases_list:
+            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+    else:
+        for target_dir in competing_phases_list:
+            if target_dir not in cpd_database.datalist:
                 prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt"])
-            subprocess.run([f"cp -r {target_dir} {piseset.path_to_cpd_database}/{piseset.functional}/"], shell=True)
-            print(f"{target_dir} has been added to the database.")
-        else:
-            print(f"{target_dir} has already existed in the database.")
+                subprocess.run([f"cp -r {target_dir} {piseset.path_to_cpd_database}/{piseset.functional}/"], shell=True)
+                print(f"{target_dir} has been added to the database.")
+            else:
+                print(f"{target_dir} has already existed in the database.")
 
     os.chdir("../../")
 
@@ -577,7 +646,10 @@ class Preparation():
                     calc_info = json.load(f)
                 
                 preparation_info.setdefault("unitcell", False)
-                preparation_info["unitcell"] = preparation_unitcell(piseset, calc_info, preparation_info)
+                if piseset.sc_dd_hybrid:
+                    preparation_info["unitcell"] = preparation_unitcell_sc_dd_hybrid(piseset, calc_info, preparation_info)
+                else:
+                    preparation_info["unitcell"] = preparation_unitcell(piseset, calc_info, preparation_info)
 
                 preparation_info.setdefault("cpd", False)
                 preparation_info["cpd"] = preparation_cpd(piseset, preparation_info, cpd_database, target_material)
@@ -585,7 +657,7 @@ class Preparation():
                 preparation_info.setdefault("defect", False)
                 preparation_info["defect"] = preparation_defect(piseset, calc_info, preparation_info)
 
-                if piseset.nsc:
+                if piseset.nsc and not piseset.sc_dd_hybrid:
                     preparation_info.setdefault("band_nsc", False)
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
 
