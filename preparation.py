@@ -273,6 +273,10 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
     if preparation_info["cpd"]:
         print("Preparation of cpd has already finished.")
         return True
+
+    if piseset.sc_dd_hybrid and not preparation_info["unitcell"]:
+        print("aexx has not prepared yet.")
+        return False
     
     print("Preparing cpd.")
     os.makedirs("cpd", exist_ok=True)
@@ -362,6 +366,10 @@ def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, targ
     if preparation_info[f"{dopant}_cpd"]:
         print(f"Preparation of {dopant}_cpd has already finished.")
         return True
+    
+    if piseset.sc_dd_hybrid and not preparation_info["unitcell"]:
+        print("aexx has not prepared yet.")
+        return False
 
     print(f"Preparing {dopant}_cpd.")
     os.makedirs(f"dopant_{dopant}", exist_ok=True)
