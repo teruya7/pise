@@ -44,12 +44,20 @@ def make_file_list():
                 list.append(f)
     return list
 
-def calc_aexx(vasprun_path):
-    vasprun = Vasprun(vasprun_path)
-    epsilon_electronic = vasprun.epsilon_static
-    AEXX = 1/((epsilon_electronic[0][0] + epsilon_electronic[1][1] + epsilon_electronic[2][2])/3)
-    AEXX_formatted = '{:.3g}'.format(AEXX)
-    return AEXX_formatted
+def calc_aexx(piseset, vasprun_path):
+    if piseset.sc_dd_hybrid:
+        os.chdir("dielectric")
+        epsilon_electronic_xx = subprocess.run(["grep -A 5 'MACROSCOPIC STATIC DIELECTRIC TENSOR (i' OUTCAR | awk '{print$1}' | awk 'NR==3'"], capture_output=True, text=True, shell=True).stdout
+        epsilon_electronic_yy = subprocess.run(["grep -A 5 'MACROSCOPIC STATIC DIELECTRIC TENSOR (i' OUTCAR | awk '{print$2}' | awk 'NR==4'"], capture_output=True, text=True, shell=True).stdout
+        epsilon_electronic_zz = subprocess.run(["grep -A 5 'MACROSCOPIC STATIC DIELECTRIC TENSOR (i' OUTCAR | awk '{print$3}' | awk 'NR==5'"], capture_output=True, text=True, shell=True).stdout
+        aexx = 1/((float(epsilon_electronic_xx) + float(epsilon_electronic_yy) + float(epsilon_electronic_zz))/3)
+        os.chdir("../")
+    else:
+        vasprun = Vasprun(vasprun_path)
+        epsilon_electronic = vasprun.epsilon_static
+        aexx = 1/((epsilon_electronic[0][0] + epsilon_electronic[1][1] + epsilon_electronic[2][2])/3)
+    aexx_formatted = '{:.3g}'.format(aexx)
+    return aexx_formatted
 
 def load_preparetion_info():
     if os.path.isfile("preparation_info.json"):
@@ -149,29 +157,40 @@ def preparation_unitcell_sc_dd_hybrid(piseset, calc_info, preparation_info):
                 former_aexx = sc_dd_hybrid_aexx[max(sc_dd_hybrid_aexx)]
         else:
             former_aexx = 0.25
+            sc_dd_hybrid_aexx = defaultdict(dict)
+            sc_dd_hybrid_aexx[0] = former_aexx
         
         #aexxを求める
-        aexx = calc_aexx("dielectric/vasprun.xml")
+        print(f"former_aexx: {former_aexx}")
+        aexx = float(calc_aexx(piseset, "dielectric/vasprun.xml"))
+        print(f"aexx: {aexx}")
 
         #former_aexxとaexxの差を比較する とりあえず0.05より小さければ収束したとみなす
-        if abs(former_aexx - aexx) < 0.05:
-            print("aexx has converged.")
+        if abs(former_aexx - aexx) < 0.005:
+            #aexxを保存
+            sc_dd_hybrid_aexx[max(sc_dd_hybrid_aexx)+1] = aexx
+            with open("sc_dd_hybrid_aexx.json", "w") as f:
+                json.dump(sc_dd_hybrid_aexx, f, indent=4)
+
             prepare_vasp_inputs("band", piseset.vise_task_command_band, piseset.job_script_path, piseset.job_table["band_hybrid"])
             prepare_vasp_inputs("dos", piseset.vise_task_command_dos, piseset.job_script_path, piseset.job_table["dos_hybrid"])
             os.chdir("../")
             return True
         else:
-            print("aexx has not converged yet.")
-
             #vise.yamlのaexxを更新
             with open("../vise.yaml") as file:
                 vise_yaml = yaml.safe_load(file)
-            vise_yaml["user_incar_settings"].setdefault("AEXX", aexx)
-            with open("../vise.yaml", 'w') as file:
-                yaml.dump(vise_yaml, file)
-            
-            sc_dd_hybrid_aexx[max(sc_dd_hybrid_aexx)+1] = aexx
 
+            try:
+                vise_yaml["user_incar_settings"]["AEXX"] = aexx
+            except KeyError:
+                vise_yaml["user_incar_settings"].setdefault("AEXX", aexx)
+            
+            with open("../vise.yaml", "w") as f:
+                yaml.dump(vise_yaml, f, sort_keys=False)
+            
+            #aexxを保存
+            sc_dd_hybrid_aexx[int(max(sc_dd_hybrid_aexx)) + 1] = aexx
             with open("sc_dd_hybrid_aexx.json", "w") as f:
                 json.dump(sc_dd_hybrid_aexx, f, indent=4)
 
@@ -180,10 +199,12 @@ def preparation_unitcell_sc_dd_hybrid(piseset, calc_info, preparation_info):
 
             os.makedirs("opt", exist_ok=True)
             os.chdir("opt")
+            subprocess.run(["cp ../opt_0.25/POSCAR ./"], shell=True)
+            subprocess.run([piseset.vise_task_command_opt], shell=True)
             prepare_job_script(piseset.job_script_path, piseset.job_table["opt_hybrid"])
             os.chdir("../../")
             return False
-
+        
 def preparation_unitcell(piseset, calc_info, preparation_info):
     #unitcellが準備済みか確認
     if preparation_info["unitcell"]:
@@ -247,7 +268,7 @@ def preparation_band_nsc(piseset, calc_info, preparation_info):
 
     print("Preparing band_nsc.")
     os.chdir("unitcell")
-    aexx = calc_aexx("dielectric_rpa/vasprun.xml")
+    aexx = calc_aexx(piseset, "dielectric_rpa/vasprun.xml")
     os.makedirs("band_nsc", exist_ok=True)
     os.chdir("band_nsc")
 
@@ -275,7 +296,7 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
         return True
 
     if piseset.sc_dd_hybrid and not preparation_info["unitcell"]:
-        print("aexx has not prepared yet.")
+        print("aexx has not prepared yet. So preparation of cpd will be skipped.")
         return False
     
     print("Preparing cpd.")
@@ -368,7 +389,7 @@ def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, targ
         return True
     
     if piseset.sc_dd_hybrid and not preparation_info["unitcell"]:
-        print("aexx has not prepared yet.")
+        print(f"aexx has not prepared yet. So preparation of {dopant}_cpd will be skipped.")
         return False
 
     print(f"Preparing {dopant}_cpd.")

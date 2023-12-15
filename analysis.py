@@ -211,14 +211,14 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
 
 def analysis_cpd(target_material, piseset, calc_info, analysis_info):
     #cpdが解析済みかどうか確認
-    if calc_info["unitcell"]["opt"]:
-        print("opt calculation has not finished yet.")
+    if analysis_info["cpd"]:
+        print("Analysis of cpd has already finished.")
         return True
     
     #optの計算が終わっているかどうか確認
-    if analysis_info["cpd"]:
-        print("Analysis of cpd has already finished. So analysis of cpd will be skipped.")
-        return True
+    if not calc_info["unitcell"]["opt"]:
+        print("opt calculation has not finished yet. So analysis of cpd will be skipped.")
+        return False
 
     #データベースからデータを取得
     if not piseset.is_hybrid[piseset.functional]:

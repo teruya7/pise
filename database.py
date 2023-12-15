@@ -21,8 +21,6 @@ class Database():
 
             #元々いたパスに戻る
             os.chdir(cwd)
-        else:
-            print(f"No such directory: {self.path}")
 
     def cal(self):
         if os.path.isdir(f"{self.path}"):
