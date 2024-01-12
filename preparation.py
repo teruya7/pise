@@ -12,12 +12,20 @@ import yaml
 from pymatgen.io.vasp.outputs import Vasprun
 from hydrogen.hydrogen import get_local_extrema
 
+#これは使わないように計算を進めたい
 def remove_from_competing_phases(target, competing_phases_list):
     try:
         competing_phases_list.remove(target)
         subprocess.run([f"rm -r {target}"], shell=True)
     except ValueError:
         pass
+
+def check_imaginary_phonon(piseset):
+    if piseset.is_hybrid[piseset.functional]:
+        imaginary_phonon_gamma = subprocess.run(["grep f/i unitcell/dielectric/OUTCAR | awk '{print$3}' | awk 'END{print $0}'"], capture_output=True, text=True, shell=True).stdout
+    else:
+        imaginary_phonon_gamma = subprocess.run(["grep f/i unitcell/dielectric/OUTCAR-finish | awk '{print$3}' | awk 'END{print $0}'"], capture_output=True, text=True, shell=True).stdout
+    return float(imaginary_phonon_gamma.replace("\n", ""))
 
 def delete_duplication(path_to_criteria, path_to_target):
     #元のパスの記録
@@ -168,7 +176,7 @@ def preparation_unitcell_sc_dd_hybrid(piseset, calc_info, preparation_info):
         #former_aexxとaexxの差を比較する とりあえず0.05より小さければ収束したとみなす
         if abs(former_aexx - aexx) < 0.005:
             #aexxを保存
-            sc_dd_hybrid_aexx[max(sc_dd_hybrid_aexx)+1] = aexx
+            sc_dd_hybrid_aexx[int(max(sc_dd_hybrid_aexx))+1] = aexx
             with open("sc_dd_hybrid_aexx.json", "w") as f:
                 json.dump(sc_dd_hybrid_aexx, f, indent=4)
 
@@ -351,9 +359,15 @@ def preparation_defect(piseset, calc_info, preparation_info):
         return True
     
     calc_info["unitcell"].setdefault("dos", False)
-    if not calc_info["unitcell"]["dos"]:
-        print("dos calculations have not finished yet. So preparing defect will be skipped.")
+    calc_info["unitcell"].setdefault("dielectric", False)
+    if not calc_info["unitcell"]["dos"] or not calc_info["unitcell"]["dielectric"]:
+        print("Dos or dielectric calculations have not finished yet. So preparing defect will be skipped.")
         return False
+    
+    imaginary_phonon_gamma = check_imaginary_phonon(piseset)
+    if imaginary_phonon_gamma > 1:
+        print(f"imaginary_phonon_gamma: {imaginary_phonon_gamma}. This material may be unstable.")
+        return True
     
     print("Preparing defect.")
     os.makedirs("defect", exist_ok=True)

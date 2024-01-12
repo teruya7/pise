@@ -199,7 +199,6 @@ class Submission():
                 except KeyError:
                     pass
 
-
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()
                     for dopant in dopants:

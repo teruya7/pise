@@ -9,6 +9,7 @@ from markdown import Markdown
 from doping import Doping
 from calculation import Calculation
 from database import Database
+from search import Search
 
 Fire({
     "tar": Target,
@@ -20,5 +21,6 @@ Fire({
     "submit": Submission,
     "md": Markdown,
     "dp": Doping,
-    "db": Database
+    "db": Database,
+    "search": Search
     })

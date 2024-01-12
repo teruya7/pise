@@ -107,39 +107,36 @@ class Target():
         
         with open(f"{self.piseset.path_to_target_summary}/target_summary_info.json", "w") as f:
             json.dump(target_summary_info, f, indent=4)
-    
-    #ある条件を満たす物質を一気にダウンロードしたいとき
-    def query(self):
-        chemsys = ["*-*-F"]
-        band_gap=[2,10]
-        num_elements=[3,3]
-        num_sites=[0,4]
-        total_magnetization=[0,0]
-        energy_above_hull=[0,0]
-        exclude_elements = ["Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Ac","Th","Pa","U","Np","Pu"]
-        
-        with MPRester(self.api_key) as mpr:
-            MPDataDoc = mpr.summary.search(band_gap=band_gap,
-                                           num_elements=num_elements,
-                                           num_sites=num_sites,
-                                           total_magnetization=total_magnetization,
-                                           chemsys=chemsys,
-                                           energy_above_hull=energy_above_hull,
-                                           exclude_elements=exclude_elements,
-                                           theoretical=False,
-                                           is_stable=True,
-                                           fields=self.fields)
-        MPDatadf = pd.DataFrame(columns=self.fields)
-        for mpdatadoc in MPDataDoc:
-            mpdatadict = MPDataDoc_to_dict(mpdatadoc)
-            mpdatadf = pd.read_json(mpdatadict)
-            MPDatadf.append(mpdatadf)
-        
-        print(MPDatadf.head())
 
-        with open("target_info.json", "w") as f:
-            json.dump(MPDatadf.to_json(), f, indent=4)
+
+    def add_escape(self, material_id):
+            #Materials projectからデータを取得
+            with MPRester(self.api_key) as mpr:
+                MPDataDoc = mpr.summary.search(material_ids=[material_id], fields=self.fields)
+            
+            #MPDataDocをdictに変換
+            MPdatadict = MPDataDoc_to_dict(MPDataDoc[0])
+
+            #symmetry情報をsymmetry_info.jsonに保存
+            if os.path.isfile("symmetry_info.json"):
+                with open('symmetry_info.json') as f:
+                    symmetry_info = json.load(f)
+            else:
+                symmetry_info = defaultdict(dict)
+            symmetry_info[material_id] = MPdatadict["symmetry"]
+            with open("symmetry_info.json", "w") as f:
+                json.dump(symmetry_info, f, indent=4)
+
+
+            #target_infoにデータを追加
+            target_info = self.target_info
+            target_info.append(MPdatadict)
+
+            #target_info.jsonにデータを保存
+            with open("target_info.json", "w") as f:
+                json.dump(target_info, f, indent=4)
     
+
 class TargetHandler():
     def __init__(self, target):
         self.formula_pretty = target["formula_pretty"]
