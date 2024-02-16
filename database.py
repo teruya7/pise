@@ -53,3 +53,4 @@ class Database():
                     submit_job(self.piseset, target)
         else:
             print(f"No such directory: {self.path}")
+    

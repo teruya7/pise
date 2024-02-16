@@ -10,6 +10,7 @@ from doping import Doping
 from calculation import Calculation
 from database import Database
 from search import Search
+from error_handler import ErrorHandler
 
 Fire({
     "tar": Target,
@@ -22,5 +23,6 @@ Fire({
     "md": Markdown,
     "dp": Doping,
     "db": Database,
-    "search": Search
+    "search": Search,
+    "eh": ErrorHandler
     })

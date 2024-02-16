@@ -8,15 +8,20 @@ from common_function import make_dir_list
 from pymatgen.io.vasp.outputs import Vasprun
 import pathlib
 import xml
+from multiprocessing import Pool, cpu_count
 
 def is_calc_converged(path):
     os.chdir(path)
     if path == "band_nsc" and os.path.isfile("vasprun.xml"):
+        touch = pathlib.Path("is_converged.txt")
+        touch.touch()
         os.chdir("../")
         return True
+    
     if os.path.isfile("is_converged.txt"):
         os.chdir("../")
         return True
+    
     if os.path.isfile("vasprun.xml"):
         try:
             vasprun = Vasprun("vasprun.xml")
@@ -28,6 +33,9 @@ def is_calc_converged(path):
         except xml.etree.ElementTree.ParseError:
             os.chdir("../")
             return False
+        except AttributeError:
+            os.chdir("../")
+            return False
         else:
             os.chdir("../")
             return False
@@ -35,70 +43,80 @@ def is_calc_converged(path):
         os.chdir("../")
         return False
 
-#target_dirのsub_dirの計算が終わったかの情報をcalc_infoに記録
-def update_calc_info(target_dir, calc_info, cwd, dopant=None):
-    if not os.path.isdir(target_dir):
+def write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_layer=None):
+    if third_layer is None:
+        try:
+            if not calc_info[first_layer][second_layer]:
+                if os.path.isfile(f"{second_layer}/is_converged.txt"):
+                    calc_info[first_layer][second_layer] = True
+                else:
+                    calc_info[first_layer][second_layer] = False
+                    print(f"{cwd}/{first_layer}/{second_layer}")
+        #keyに存在していない場合
+        except KeyError:
+            if os.path.isfile(f"{second_layer}/is_converged.txt"):
+                calc_info[first_layer][second_layer] = True
+            else:
+                calc_info[first_layer][second_layer] = False
+                print(f"{cwd}/{first_layer}/{second_layer}")
+    #dopantやsurfaceなど階層構造が深くなる場合
+    else:
+        try:
+            if not calc_info[first_layer][second_layer][third_layer]:
+                if os.path.isfile(f"{third_layer}/is_converged.txt"):
+                    calc_info[first_layer][second_layer][third_layer] = True
+                else:
+                    calc_info[first_layer][second_layer][third_layer] = False
+                    print(f"{cwd}/{first_layer}/{second_layer}/{third_layer}")
+        except KeyError:
+            if os.path.isfile(f"{third_layer}/is_converged.txt"):
+                calc_info[first_layer][second_layer][third_layer] = True
+            else:
+                calc_info[first_layer][second_layer][third_layer] = False
+                print(f"{cwd}/{first_layer}/{second_layer}/{third_layer}")
+
+def update_calc_info(first_layer, calc_info, cwd, dopant=None):
+    if not os.path.isdir(first_layer):
         return calc_info
     
-    os.chdir(target_dir)
+    os.chdir(first_layer)
 
-    if target_dir == "surface":   
+    p = Pool(processes=int(cpu_count()*0.9))
+
+    if first_layer == "surface":   
         surface_list = make_dir_list()
-        for surface in surface_list:
-            os.chdir(surface)
+        for second_layer in surface_list:
+            os.chdir(second_layer)
             dir_list = make_dir_list()
-            for sub_dir in dir_list:
-                try:
-                    if not calc_info[target_dir][surface][sub_dir]:
-                        if is_calc_converged(sub_dir):
-                            calc_info[target_dir][surface][sub_dir] = True
-                        else:
-                            calc_info[target_dir][surface][sub_dir] = False
-                            print(f"{cwd}/{target_dir}/{surface}/{sub_dir}")
-                except KeyError:
-                    if is_calc_converged(sub_dir):
-                        calc_info[target_dir][surface][sub_dir] = True
-                    else:
-                        calc_info[target_dir][surface][sub_dir] = False
-                        print(f"{cwd}/{target_dir}/{surface}/{sub_dir}")
+            p.imap(is_calc_converged, dir_list)
+            for third_layer in dir_list:
+                write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_layer)
             os.chdir("../")
         os.chdir("../")
         return calc_info
 
     if dopant is not None:
         dir_list = make_dir_list()
-        for sub_dir in dir_list:
-            try:
-                if not calc_info[f"dopant_{dopant}"][target_dir][sub_dir]:
-                    if is_calc_converged(sub_dir):
-                        calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = True
-                    else:
-                        calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = False
-                        print(f"{cwd}/dopant_{dopant}/{target_dir}/{sub_dir}")
-            except KeyError:
-                if is_calc_converged(sub_dir):
-                    calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = True
-                else:
-                    calc_info[f"dopant_{dopant}"][target_dir][sub_dir] = False
-                    print(f"{cwd}/dopant_{dopant}/{target_dir}/{sub_dir}")
-    else:
-        dir_list = make_dir_list()
-        for sub_dir in dir_list:
-            try:
-                if not calc_info[target_dir][sub_dir]:
-                    if is_calc_converged(sub_dir):
-                        calc_info[target_dir][sub_dir] = True
-                    else:
-                        calc_info[target_dir][sub_dir] = False
-                        print(f"{cwd}/{target_dir}/{sub_dir}")
-            except KeyError:
-                if is_calc_converged(sub_dir):
-                    calc_info[target_dir][sub_dir] = True
-                else:
-                    calc_info[target_dir][sub_dir] = False
-                    print(f"{cwd}/{target_dir}/{sub_dir}")
+        p.imap(is_calc_converged, dir_list)
+
+        for second_layer in dir_list:
+            write_result_to_calc_info(calc_info, cwd, f"dopant_{dopant}", first_layer, second_layer)
+
+        os.chdir("../")
+        return calc_info
+
+    dir_list = make_dir_list()
+    p.imap(is_calc_converged, dir_list)
+    for second_layer in dir_list:
+        write_result_to_calc_info(calc_info, cwd, first_layer, second_layer)
     os.chdir("../")
+
+    # 並列処理の終了
+    p.close()
+    p.join()
+
     return calc_info
+
 
 class Calculation():
     def __init__(self):

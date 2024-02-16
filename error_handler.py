@@ -35,29 +35,29 @@ def get_repeat_directory_name():
 
 def get_vaspout_name():
     if os.path.isfile("progress-finish"):
-        vaspout = "progress-finish"
+        vaspout_name = "progress-finish"
     elif os.path.isfile("progress-10"):
-        vaspout = "progress-10"
+        vaspout_name = "progress-10"
     elif os.path.isfile("progress-9"):
-        vaspout = "progress-9"
+        vaspout_name = "progress-9"
     elif os.path.isfile("progress-8"):
-        vaspout = "progress-8"
+        vaspout_name = "progress-8"
     elif os.path.isfile("progress-7"):
-        vaspout = "progress-7"
+        vaspout_name = "progress-7"
     elif os.path.isfile("progress-6"):
-        vaspout = "progress-6"
+        vaspout_name = "progress-6"
     elif os.path.isfile("progress-5"):
-        vaspout = "progress-5"
+        vaspout_name = "progress-5"
     elif os.path.isfile("progress-4"):
-        vaspout = "progress-4"
+        vaspout_name = "progress-4"
     elif os.path.isfile("progress-3"):
-        vaspout = "progress-3"
+        vaspout_name = "progress-3"
     elif os.path.isfile("progress-2"):
-        vaspout = "progress-2"
+        vaspout_name = "progress-2"
     elif os.path.isfile("progress-1"):
-        vaspout = "progress-1"
+        vaspout_name = "progress-1"
 
-    return vaspout
+    return vaspout_name
 
 def get_running_jobs_list(piseset):
     subprocess.run([f" {piseset.running_jobs_command} | grep {os.getcwd()} > running_jobs.txt"], shell=True)
@@ -88,6 +88,9 @@ def delete_unnecessary_files():
     
     if os.path.isfile("vasprun.xml"):
         os.remove("vasprun.xml")
+    
+    if os.path.isfile("std_err.txt"):
+        os.remove("std_err.txt")
     
     if os.path.isdir("gga"):
         shutil.rmtree("gga")
@@ -155,9 +158,12 @@ def error_handling(target_dir, calc_info, cwd, running_jobs_list):
     for directory_name, is_finished in calc_info[target_dir].items():
         if not is_finished and f"{cwd}/{target_dir}/{directory_name}" not in running_jobs_list:
             os.chdir(f"{target_dir}/{directory_name}")
+            print()
             print(f"{cwd}/{target_dir}/{directory_name}")
 
-            if os.path.isfile("POSCAR-10"):
+            if os.path.isfile("ready_for_submission.txt"):
+                print("This job has not been submitted yet.")
+            elif os.path.isfile("POSCAR-10"):
                 print("Calculations have not converged.")
                 subprocess.run(["cp POSCAR-10 POSCAR"], shell=True)
                 delete_unnecessary_files()
@@ -170,12 +176,13 @@ def error_handling(target_dir, calc_info, cwd, running_jobs_list):
             else:
                 print("Unknown error!!")
 
+
             os.chdir("../../")
 
 class ErrorHandler():
     def __init__(self):
         piseset = PiseSet()
-        running_jobs_list = get_running_jobs_list()
+        running_jobs_list = get_running_jobs_list(piseset)
 
         for target in piseset.target_info:
             target_material = TargetHandler(target)

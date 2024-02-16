@@ -11,6 +11,7 @@ import pathlib
 import yaml
 from pymatgen.io.vasp.outputs import Vasprun
 from hydrogen.hydrogen import get_local_extrema
+from multiprocessing import Pool, cpu_count
 
 #これは使わないように計算を進めたい
 def remove_from_competing_phases(target, competing_phases_list):
@@ -98,6 +99,8 @@ def prepare_vasp_inputs(target_dir, vise_task_command, job_script_path, job_scri
         subprocess.run([vise_task_command], shell=True)
     os.chdir("../")
 
+def wrap_prepare_vasp_inputs(args):
+    return prepare_vasp_inputs(*args)
 #---------------------------------------------------------
 def preparation_opt(piseset, material_id, formula_pretty):
     print("Preparing opt.")
@@ -324,11 +327,6 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
     #競合相から取り除きたいもの(ファイルに登録したい)
     remove_from_competing_phases("host", competing_phases_list)
     remove_from_competing_phases(f"{target_material.formula_pretty}_{target_material.material_id}", competing_phases_list)
-    remove_from_competing_phases("Sc39N34_mp-685209", competing_phases_list)
-    remove_from_competing_phases("F2_mp-1067793", competing_phases_list)
-    remove_from_competing_phases("B2S3_mp-1199451", competing_phases_list)
-    remove_from_competing_phases("Sb2S19F12_mp-723419", competing_phases_list)
-    remove_from_competing_phases("CaMg149_mp-1184449", competing_phases_list)
 
     #competing_phases_info.jsonの保存
     competing_phases_dict = defaultdict(dict)
@@ -338,8 +336,11 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
 
     #sc-dd-hybridだとaexxが違うからデータベースを作りにくい
     if piseset.is_hybrid[piseset.functional]:
-        for target_dir in competing_phases_list:
-            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+        p = Pool(processes=int(cpu_count()*0.9))
+        prepare_args = [(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"]) for target_dir in competing_phases_list]
+        p.imap(wrap_prepare_vasp_inputs, prepare_args)
+        p.close()
+        p.join()
     else:
         for target_dir in competing_phases_list:
             if target_dir not in cpd_database.datalist:
@@ -382,13 +383,18 @@ def preparation_defect(piseset, calc_info, preparation_info):
         subprocess.run(["pydefect_vasp de"], shell=True)
         
         #計算インプットの作成
+        p = Pool(processes=int(cpu_count()*0.9))
         defect_dir_list = make_dir_list()
-        for target_dir in defect_dir_list:
-            if piseset.is_hybrid[piseset.functional]:
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"])
-            else:
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
+        if piseset.is_hybrid[piseset.functional]:
+            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
+            p.imap(wrap_prepare_vasp_inputs, prepare_args)
+        else:
+            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
+            p.imap(wrap_prepare_vasp_inputs, prepare_args)
         
+        # 並列処理の終了
+        p.close()
+        p.join()
         os.chdir("../")
         return True
     
@@ -429,10 +435,6 @@ def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, targ
     #競合相から取り除きたいもの
     remove_from_competing_phases("host", competing_phases_list)
     remove_from_competing_phases(f"{target_material.formula_pretty}_{target_material.material_id}", competing_phases_list)
-    remove_from_competing_phases("Sc39N34_mp-685209", competing_phases_list)
-    remove_from_competing_phases("F2_mp-1067793", competing_phases_list)
-    remove_from_competing_phases("B2S3_mp-1199451", competing_phases_list)
-    remove_from_competing_phases("Sb2S19F12_mp-723419", competing_phases_list)
 
     #competing_phases_info.jsonの保存
     competing_phases_dict = defaultdict(dict)
@@ -441,8 +443,11 @@ def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, targ
         json.dump(competing_phases_dict, f, indent=4)
 
     if piseset.is_hybrid[piseset.functional]:
-        for target_dir in competing_phases_list:
-            prepare_vasp_inputs(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"])
+        p = Pool(processes=int(cpu_count()*0.9))
+        prepare_args = [(target_dir, piseset.vise_task_command_opt, piseset.job_script_path, piseset.job_table["opt_hybrid"]) for target_dir in competing_phases_list]
+        p.imap(wrap_prepare_vasp_inputs, prepare_args)
+        p.close()
+        p.join()
     else:
         for target_dir in competing_phases_list:
             if target_dir not in cpd_database.datalist:
@@ -492,19 +497,26 @@ def preparation_dopant_defect(piseset, preparation_info, dopant, site):
     subprocess.run(["rm -r perfect"], shell=True)
 
     #計算インプットの作成
+    p = Pool(processes=int(cpu_count()*0.9))
     defect_dir_list = make_dir_list()
-    for target_dir in defect_dir_list:
-        if piseset.is_hybrid[piseset.functional]:
-            if dopant == "H":
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect_hybrid"])
-            else:
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"])
+    if piseset.is_hybrid[piseset.functional]:
+        if dopant == "H":
+            prepare_args = [(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
+            p.imap(wrap_prepare_vasp_inputs, prepare_args)
         else:
-            if dopant == "H":
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect"])
-            else:
-                prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
+            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
+            p.imap(wrap_prepare_vasp_inputs, prepare_args)
+    else:
+        if dopant == "H":
+            prepare_args = [(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
+            p.imap(wrap_prepare_vasp_inputs, prepare_args)
+        else:
+            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
+            p.imap(wrap_prepare_vasp_inputs, prepare_args)
     
+    # 並列処理の終了
+    p.close()
+    p.join()
     os.chdir("../../")
     return True
 

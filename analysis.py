@@ -9,11 +9,12 @@ from pise_set import PiseSet
 from collections import defaultdict
 import json
 from target import TargetHandler
-from calculation import Calculation
+from calculation import Calculation, make_dir_list
 from doping import get_dopants_list
 from surface import plot_band_alignment, calculation_surface_energy, plot_averaged_locpot
 from common_function import get_label_from_chempotdiag
 from pydefect.chem_pot_diag.chem_pot_diag import RelativeEnergies, ChemPotDiagMaker, UnstableTargetError
+from multiprocessing import Pool, cpu_count
 
 def make_cpd_and_vertices(target, elements_list):
     rel_energies = RelativeEnergies.from_yaml("relative_energies.yaml")
@@ -133,10 +134,9 @@ def plot_energy_diagram(labels):
         subprocess.run([f"pydefect pe -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
         change_name(f"energy_{label}.pdf", f"energy_{label}_default.pdf")
         change_name(f"energy_{label}.png", f"energy_{label}_default.png")
-        
-        subprocess.run([f"pydefect pe -y -5 5 -d defect_energy_summary.json -l {label} --allow_shallow"], shell=True)
-        change_name(f"energy_{label}.pdf", f"energy_{label}_-5_5.pdf")
-        change_name(f"energy_{label}.png", f"energy_{label}_-5_5.png")
+
+def make_calc_results(path):
+    subprocess.run([f"pydefect_vasp cr -d {path}"], shell=True)
 
 #---------------------------------------------------------------------------------
 
@@ -297,8 +297,16 @@ def analysis_defect(calc_info, analysis_info):
         return False
 
     print("Analyzing defect.")
-    os.chdir("defect") 
-    subprocess.run(["pydefect_vasp cr -d *_*/ perfect"], shell=True)
+    os.chdir("defect")
+    dir_list = make_dir_list()
+
+    p = Pool(processes=int(cpu_count()*0.9))
+    p.imap(make_calc_results, dir_list)
+    p.close()
+    p.join()
+    # subprocess.run(["pydefect_vasp cr -d *_*/ perfect"], shell=True)
+
+
     subprocess.run(["pydefect efnv -d *_*/ -pcr perfect/calc_results.json -u ../unitcell/unitcell.yaml"], shell=True)
     subprocess.run(["pydefect dsi -d *_*/"], shell=True)
     subprocess.run(["pydefect_util dvf -d *_*"], shell=True)

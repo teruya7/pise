@@ -13,6 +13,7 @@ class PiseSet():
             self.limit_jobs = pise_defaults["limit_jobs"]
             self.submit_command = pise_defaults["submit_command"]
             self.num_jobs_command = pise_defaults["num_jobs_command"]
+            self.running_jobs_command = pise_defaults["running_jobs_command"]
             self.job_script_path = pise_defaults["job_script_path"]
             self.path_to_tsubo = pise_defaults["path_to_tsubo"]
             self.path_to_cpd_database = pise_defaults["path_to_cpd_database"]
