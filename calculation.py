@@ -11,37 +11,25 @@ import xml
 from multiprocessing import Pool, cpu_count
 
 def is_calc_converged(path):
-    os.chdir(path)
-    if path == "band_nsc" and os.path.isfile("vasprun.xml"):
-        touch = pathlib.Path("is_converged.txt")
+    if os.path.isfile(f"{path}/is_converged.txt"):
+        return 
+    
+    if path == "band_nsc" and os.path.isfile(f"{path}/vasprun.xml"):
+        touch = pathlib.Path(f"{path}/is_converged.txt")
         touch.touch()
-        os.chdir("../")
-        return True
+        return
     
-    if os.path.isfile("is_converged.txt"):
-        os.chdir("../")
-        return True
-    
-    if os.path.isfile("vasprun.xml"):
+    if os.path.isfile(f"{path}/vasprun.xml"):
         try:
-            vasprun = Vasprun("vasprun.xml")
+            vasprun = Vasprun(f"{path}/vasprun.xml")
             if vasprun.converged:
-                touch = pathlib.Path("is_converged.txt")
+                touch = pathlib.Path(f"{path}/is_converged.txt")
                 touch.touch()
-                os.chdir("../")
-                return True
+                return 
         except xml.etree.ElementTree.ParseError:
-            os.chdir("../")
-            return False
+            pass
         except AttributeError:
-            os.chdir("../")
-            return False
-        else:
-            os.chdir("../")
-            return False
-    else:
-        os.chdir("../")
-        return False
+            pass
 
 def write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_layer=None):
     if third_layer is None:
@@ -50,7 +38,6 @@ def write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_l
                 if os.path.isfile(f"{second_layer}/is_converged.txt"):
                     calc_info[first_layer][second_layer] = True
                 else:
-                    calc_info[first_layer][second_layer] = False
                     print(f"{cwd}/{first_layer}/{second_layer}")
         #keyに存在していない場合
         except KeyError:
@@ -66,7 +53,6 @@ def write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_l
                 if os.path.isfile(f"{third_layer}/is_converged.txt"):
                     calc_info[first_layer][second_layer][third_layer] = True
                 else:
-                    calc_info[first_layer][second_layer][third_layer] = False
                     print(f"{cwd}/{first_layer}/{second_layer}/{third_layer}")
         except KeyError:
             if os.path.isfile(f"{third_layer}/is_converged.txt"):
@@ -81,7 +67,42 @@ def update_calc_info(first_layer, calc_info, cwd, dopant=None):
     
     os.chdir(first_layer)
 
-    p = Pool(processes=int(cpu_count()*0.9))
+    if first_layer == "surface":   
+        surface_list = make_dir_list()
+        for second_layer in surface_list:
+            os.chdir(second_layer)
+            dir_list = make_dir_list()
+            for third_layer in dir_list:
+                is_calc_converged(third_layer)
+                write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_layer)
+            os.chdir("../")
+        os.chdir("../")
+        return calc_info
+
+    if dopant is not None:
+        dir_list = make_dir_list()
+        for second_layer in dir_list:
+            is_calc_converged(second_layer)
+            write_result_to_calc_info(calc_info, cwd, f"dopant_{dopant}", first_layer, second_layer)
+
+        os.chdir("../")
+        return calc_info
+
+    dir_list = make_dir_list()
+    for second_layer in dir_list:
+        is_calc_converged(second_layer)
+        write_result_to_calc_info(calc_info, cwd, first_layer, second_layer)
+    os.chdir("../")
+
+    return calc_info
+
+def update_calc_info_parallel(first_layer, calc_info, cwd, num_process, dopant=None):
+    if not os.path.isdir(first_layer):
+        return calc_info
+    
+    os.chdir(first_layer)
+
+    p = Pool(processes=num_process)
 
     if first_layer == "surface":   
         surface_list = make_dir_list()
@@ -124,6 +145,13 @@ class Calculation():
         #pise.yamlとtarget_info.jsonの読み込み
         piseset = PiseSet()
 
+        #並列処理
+        if piseset.parallel:
+            num_process = int(cpu_count()*0.5)
+            print(f"num_process:{num_process}")
+        else:
+            print("Multiprocessing is switched off.")
+
         for target in piseset.target_info:
             target_material = TargetHandler(target)
             path = target_material.make_path(piseset.functional)
@@ -134,22 +162,34 @@ class Calculation():
                 calc_info = defaultdict(lambda:defaultdict(lambda: defaultdict(lambda: defaultdict(dict))))
 
                 #calc_info.jsonの更新 
-                cwd = os.getcwd()  
-                update_calc_info("unitcell", calc_info, cwd)
-                update_calc_info("cpd", calc_info, cwd)
-                update_calc_info("defect", calc_info, cwd)
+                cwd = os.getcwd()
+                if piseset.parallel:
+                    update_calc_info_parallel("unitcell", calc_info, cwd, num_process)
+                    update_calc_info_parallel("cpd", calc_info, cwd, num_process)
+                    update_calc_info_parallel("defect", calc_info, cwd, num_process)
+                else:
+                    update_calc_info("unitcell", calc_info, cwd)
+                    update_calc_info("cpd", calc_info, cwd)
+                    update_calc_info("defect", calc_info, cwd)
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()
                     for dopant in dopants:
                         if os.path.isdir(f"dopant_{dopant}"):
                             os.chdir(f"dopant_{dopant}")
-                            update_calc_info("cpd", calc_info, cwd, dopant=dopant)
-                            update_calc_info("defect", calc_info, cwd, dopant=dopant)
+                            if piseset.parallel:
+                                update_calc_info_parallel("cpd", calc_info, cwd, num_process, dopant=dopant)
+                                update_calc_info_parallel("defect", calc_info, cwd, num_process, dopant=dopant)
+                            else:
+                                update_calc_info("cpd", calc_info, cwd, dopant=dopant)
+                                update_calc_info("defect", calc_info, cwd, dopant=dopant)
                             os.chdir("../")
 
                 if piseset.surface:
-                    update_calc_info("surface", calc_info, cwd)
+                    if piseset.parallel:
+                        update_calc_info_parallel("surface", calc_info, cwd, num_process)
+                    else:
+                        update_calc_info("surface", calc_info, cwd)
 
                 #calc_info.jsonの保存
                 with open("calc_info.json", "w") as f:
@@ -161,4 +201,4 @@ class Calculation():
                 print(f"No such directory: {path}")
         
 if __name__ == '__main__':
-    Calculation()
+    pass

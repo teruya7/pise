@@ -354,7 +354,7 @@ def preparation_cpd(piseset, preparation_info, cpd_database, target_material):
 
     return True
 
-def preparation_defect(piseset, calc_info, preparation_info):
+def preparation_defect(piseset, calc_info, preparation_info, num_process):
     if preparation_info["defect"]:
         print("Preparation of defect has already finished.")
         return True
@@ -382,26 +382,32 @@ def preparation_defect(piseset, calc_info, preparation_info):
             subprocess.run(["pydefect ds"], shell=True)
         subprocess.run(["pydefect_vasp de"], shell=True)
         
-        #計算インプットの作成
-        p = Pool(processes=int(cpu_count()*0.9))
         defect_dir_list = make_dir_list()
-        if piseset.is_hybrid[piseset.functional]:
-            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
-            p.imap(wrap_prepare_vasp_inputs, prepare_args)
+        if piseset.parallel:
+            p = Pool(processes=num_process)
+            if piseset.is_hybrid[piseset.functional]:
+                prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
+                p.imap(wrap_prepare_vasp_inputs, prepare_args)
+            else:
+                prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
+                p.imap(wrap_prepare_vasp_inputs, prepare_args)
+            p.close()
+            p.join()
         else:
-            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
-            p.imap(wrap_prepare_vasp_inputs, prepare_args)
-        
-        # 並列処理の終了
-        p.close()
-        p.join()
+            if piseset.is_hybrid[piseset.functional]:
+                for target_dir in defect_dir_list:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"])
+            else:
+                for target_dir in defect_dir_list:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
+
         os.chdir("../")
         return True
-    
     else:
         print("No such file: supercell_info.json")
+        subprocess.run(["touch no_supercell_info_error.txt"], shell=True)
         os.chdir("../")
-        return False
+        return True
             
 def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, target_material):
     if preparation_info[f"{dopant}_cpd"]:
@@ -461,7 +467,7 @@ def preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, targ
 
     return True
 
-def preparation_dopant_defect(piseset, preparation_info, dopant, site):
+def preparation_dopant_defect(piseset, preparation_info, dopant, site, num_process):
     if preparation_info[f"{dopant}_defect"]:
         print(f"Preparation of {dopant}_defect has already finished.")
         return True
@@ -496,27 +502,41 @@ def preparation_dopant_defect(piseset, preparation_info, dopant, site):
     subprocess.run(["pydefect_vasp de"], shell=True)
     subprocess.run(["rm -r perfect"], shell=True)
 
-    #計算インプットの作成
-    p = Pool(processes=int(cpu_count()*0.9))
     defect_dir_list = make_dir_list()
-    if piseset.is_hybrid[piseset.functional]:
-        if dopant == "H":
-            prepare_args = [(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
-            p.imap(wrap_prepare_vasp_inputs, prepare_args)
+    if piseset.parallel:
+        p = Pool(processes=num_process)
+        if piseset.is_hybrid[piseset.functional]:
+            if dopant == "H":
+                prepare_args = [(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
+                p.imap(wrap_prepare_vasp_inputs, prepare_args)
+            else:
+                prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
+                p.imap(wrap_prepare_vasp_inputs, prepare_args)
         else:
-            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"]) for target_dir in defect_dir_list]
-            p.imap(wrap_prepare_vasp_inputs, prepare_args)
+            if dopant == "H":
+                prepare_args = [(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
+                p.imap(wrap_prepare_vasp_inputs, prepare_args)
+            else:
+                prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
+                p.imap(wrap_prepare_vasp_inputs, prepare_args)
+        p.close()
+        p.join()
     else:
-        if dopant == "H":
-            prepare_args = [(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
-            p.imap(wrap_prepare_vasp_inputs, prepare_args)
+        if piseset.is_hybrid[piseset.functional]:
+            if dopant == "H":
+                for target_dir in defect_dir_list:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect_hybrid"])
+            else:
+                for target_dir in defect_dir_list:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect_hybrid"])
         else:
-            prepare_args = [(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"]) for target_dir in defect_dir_list]
-            p.imap(wrap_prepare_vasp_inputs, prepare_args)
-    
-    # 並列処理の終了
-    p.close()
-    p.join()
+            if dopant == "H":
+                for target_dir in defect_dir_list:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect_hydrogen, piseset.job_script_path, piseset.job_table["defect"])
+            else:
+                for target_dir in defect_dir_list:
+                    prepare_vasp_inputs(target_dir, piseset.vise_task_command_defect, piseset.job_script_path, piseset.job_table["defect"])
+
     os.chdir("../../")
     return True
 
@@ -684,9 +704,13 @@ class Preparation():
     def __init__(self):
         #pise.yamlとtarget_info.jsonの読み込み
         piseset = PiseSet()
-        
-        #calc_info.jsonの更新
-        Calculation()
+
+        #並列処理
+        num_process = int(cpu_count()*0.5)
+        if piseset.parallel:
+            print(f"num_process:{num_process}")
+        else:
+            print("Multiprocessing is switched off.")
 
         for target in piseset.target_info:
             target_material = TargetHandler(target)
@@ -710,7 +734,7 @@ class Preparation():
                 preparation_info["cpd"] = preparation_cpd(piseset, preparation_info, cpd_database, target_material)
 
                 preparation_info.setdefault("defect", False)
-                preparation_info["defect"] = preparation_defect(piseset, calc_info, preparation_info)
+                preparation_info["defect"] = preparation_defect(piseset, calc_info, preparation_info, num_process)
 
                 if piseset.nsc and not piseset.sc_dd_hybrid:
                     preparation_info.setdefault("band_nsc", False)
@@ -731,7 +755,7 @@ class Preparation():
                         preparation_info[f"{dopant}_cpd"] = preparation_dopant_cpd(piseset, preparation_info, dopant, cpd_database, target_material)
                         
                         preparation_info.setdefault(f"{dopant}_defect", False)
-                        preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant, site)
+                        preparation_info[f"{dopant}_defect"] = preparation_dopant_defect(piseset, preparation_info, dopant, site, num_process)
                 
                 if piseset.surface:
                     preparation_info.setdefault("surface", False)

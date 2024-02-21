@@ -39,12 +39,12 @@ class Summury():
                 with open('analysis_info.json') as f:
                     analysis_info = json.load(f)
 
-                if not check_analysis_alldone(analysis_info.values()):
+                if not analysis_info["unitcell"] or not analysis_info["cpd"] or not analysis_info["defect"]:
                     print("Analysis has not completed yet. So making summary will be skipped.")
                     os.chdir("../../")
                     continue
-
-                #summary_info.jsonを読み込み
+                
+                print(f"Making summary_info.json.")
                 summary_info = defaultdict(dict)
 
                 if target_material.material_id != "None":
@@ -115,7 +115,8 @@ class Summury():
                         pise_dopants_and_sites = yaml.safe_load(file)
                     for dopant_and_site in pise_dopants_and_sites["dopants_and_sites"]:
                         dopant = dopant_and_site[0]
-                        summary_info[dopant]["labels"] = get_label_from_chempotdiag(f"dopant_{dopant}/cpd/chem_pot_diag.json")
+                        if analysis_info[f"{dopant}_cpd"]:
+                            summary_info[dopant]["labels"] = get_label_from_chempotdiag(f"dopant_{dopant}/cpd/chem_pot_diag.json")
                     
 
                 #summary_info.jsonの保存

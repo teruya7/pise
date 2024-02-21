@@ -143,8 +143,8 @@ class Markdown():
                         f.write(f"{summary}\n")
                         for label in summary_info["labels"]:
                             f.write(f"## {label}\n")
-                            f.write(f"### energy_{label}_default\n")
-                            f.write(f"![Alt text](defect/energy_{label}_default.png)\n")
+                            f.write(f"### energy_{label}\n")
+                            f.write(f"![Alt text](defect/energy_{label}.png)\n")
 
                         if os.path.isfile("pise_dopants_and_sites.yaml"):
                             dopants = get_dopants_list()
@@ -156,7 +156,7 @@ class Markdown():
                                 for label in summary_info[dopant]["labels"]:
                                     f.write(f"## {label}\n")
                                     f.write(f"### energy_{label}_default\n")
-                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}_default.png)\n")
+                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}.png)\n")
                     markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = True
                 else:
                     print("No such file: summary_info.json")

@@ -7,7 +7,7 @@ import pathlib
 from pise_set import PiseSet
 from target import TargetHandler
 from doping import get_dopants_list
-from custodian.vasp.handlers import VaspErrorHandler, UnconvergedErrorHandler, AliasingErrorHandler, MeshSymmetryErrorHandler, NonConvergingErrorHandler, PositiveEnergyErrorHandler, PotimErrorHandler, StdErrHandler
+from custodian.vasp.handlers import VaspErrorHandler, UnconvergedErrorHandler, AliasingErrorHandler, MeshSymmetryErrorHandler, NonConvergingErrorHandler, PositiveEnergyErrorHandler, PotimErrorHandler, StdErrHandler, WalltimeHandler
 
 
 #出力ファイルの名前の特定
@@ -30,6 +30,10 @@ def get_repeat_directory_name():
         repeat_directory_name = "repeat-8"
     elif os.path.isdir("repeat-9"):
         repeat_directory_name = "repeat-9"
+    elif os.path.isdir("repeat-10"):
+        repeat_directory_name = "repeat-10"
+    else:
+        return None
 
     return repeat_directory_name
 
@@ -56,6 +60,8 @@ def get_vaspout_name():
         vaspout_name = "progress-2"
     elif os.path.isfile("progress-1"):
         vaspout_name = "progress-1"
+    else:
+        return None
 
     return vaspout_name
 
@@ -102,6 +108,9 @@ def check_and_correct_errors():
     vaspout = get_vaspout_name()
     repeat_directory_name = get_repeat_directory_name()
 
+    if vaspout is None or repeat_directory_name is None:
+        return False
+
     aliasingerrorhandler = AliasingErrorHandler(output_filename=vaspout)
     if aliasingerrorhandler.check():
         aliasingerrorhandler.correct()
@@ -128,7 +137,7 @@ def check_and_correct_errors():
             print("MeshSymmetryErrorHandler is used to correct an error.")
             return True
 
-    nonconvergingerrorhandler = NonConvergingErrorHandler(output_filename=f"{repeat_directory_name}/OSZICAR",nionic_steps=50)
+    nonconvergingerrorhandler = NonConvergingErrorHandler(output_filename=f"{repeat_directory_name}/OSZICAR",nionic_steps=5)
     if nonconvergingerrorhandler.check():
         nonconvergingerrorhandler.correct()
         print("NonConvergingErrorHandler is used to correct an error.")
@@ -155,29 +164,31 @@ def check_and_correct_errors():
             return True
     
 def error_handling(target_dir, calc_info, cwd, running_jobs_list):
-    for directory_name, is_finished in calc_info[target_dir].items():
-        if not is_finished and f"{cwd}/{target_dir}/{directory_name}" not in running_jobs_list:
-            os.chdir(f"{target_dir}/{directory_name}")
-            print()
-            print(f"{cwd}/{target_dir}/{directory_name}")
+    try:
+        for directory_name, is_finished in calc_info[target_dir].items():
+            if not is_finished and f"{cwd}/{target_dir}/{directory_name}" not in running_jobs_list:
+                os.chdir(f"{target_dir}/{directory_name}")
+                print()
+                print(f"{cwd}/{target_dir}/{directory_name}")
 
-            if os.path.isfile("ready_for_submission.txt"):
-                print("This job has not been submitted yet.")
-            elif os.path.isfile("POSCAR-10"):
-                print("Calculations have not converged.")
-                subprocess.run(["cp POSCAR-10 POSCAR"], shell=True)
-                delete_unnecessary_files()
-                touch = pathlib.Path("ready_for_submission.txt")
-                touch.touch()
-            elif check_and_correct_errors():
-                delete_unnecessary_files()
-                touch = pathlib.Path("ready_for_submission.txt")
-                touch.touch()
-            else:
-                print("Unknown error!!")
+                if os.path.isfile("ready_for_submission.txt"):
+                    print("This job has not been submitted yet.")
+                elif os.path.isfile("POSCAR-10"):
+                    print("Calculations have not converged.")
+                    subprocess.run(["cp POSCAR-10 POSCAR"], shell=True)
+                    delete_unnecessary_files()
+                    touch = pathlib.Path("ready_for_submission.txt")
+                    touch.touch()
+                elif check_and_correct_errors():
+                    delete_unnecessary_files()
+                    touch = pathlib.Path("ready_for_submission.txt")
+                    touch.touch()
+                else:
+                    print("Unknown error!!")
 
-
-            os.chdir("../../")
+                os.chdir("../../")
+    except KeyError:
+        pass
 
 class ErrorHandler():
     def __init__(self):
@@ -195,7 +206,8 @@ class ErrorHandler():
                     calc_info = json.load(f)
                 
                 error_handling("unitcell", calc_info, cwd_native, running_jobs_list)
-                error_handling("cpd", calc_info, cwd_native, running_jobs_list)
+                if piseset.is_hybrid[piseset.functional]:
+                    error_handling("cpd", calc_info, cwd_native, running_jobs_list)
                 error_handling("defect", calc_info, cwd_native, running_jobs_list)
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):

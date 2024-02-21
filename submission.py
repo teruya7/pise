@@ -52,7 +52,6 @@ class Submission():
     def __init__(self):
         #pise.yamlとtarget_info.jsonの読み込み
         self.piseset = PiseSet()
-        Calculation()
 
     #全てのtargetを対象にジョブを投げる
     def all(self):

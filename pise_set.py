@@ -68,6 +68,7 @@ class PiseSet():
             self.nsc = pise["nsc"]
             self.abs = pise["abs"]
             self.surface = pise["surface"]
+            self.parallel = pise["parallel"]
             self.hydrogen = pise["hydrogen"]
             self.path_to_poscar = pise["path_to_poscar"]
             self.sc_dd_hybrid = pise["sc_dd_hybrid"]
