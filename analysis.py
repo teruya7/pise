@@ -489,15 +489,13 @@ def analysis_dopant_defect(dopant, piseset, calc_info, analysis_info, num_proces
     
     if piseset.parallel:
         dir_list = make_dir_list()
-        dir_list_no_perfect = make_dir_list()
-        dir_list_no_perfect.remove("perfect")
         
         paralell_analysis(make_calc_results, dir_list, num_process)
-        paralell_analysis(make_efnv_correction_dopant, dir_list_no_perfect, num_process)
-        paralell_analysis(make_defect_structure_info, dir_list_no_perfect, num_process)
+        paralell_analysis(make_efnv_correction_dopant, dir_list, num_process)
+        paralell_analysis(make_defect_structure_info, dir_list, num_process)
         make_perfect_band_edge_state()
-        paralell_analysis(make_band_edge_orb_infos_and_eigval_plot, dir_list_no_perfect, num_process)
-        paralell_analysis(make_band_edge_states, dir_list_no_perfect, num_process)
+        paralell_analysis(make_band_edge_orb_infos_and_eigval_plot, dir_list, num_process)
+        paralell_analysis(make_band_edge_states, dir_list, num_process)
 
         #無添加相のdefectの情報をシンボリックリンクで持ってくる
         for defect_dir_name in calc_info["defect"].keys():
