@@ -153,10 +153,13 @@ class Markdown():
                                 f.write("## cpd\n")
                                 f.write(f"![Alt text](dopant_{dopant}/cpd/cpd.png)\n")
                                 f.write("# defect formation energy\n")
-                                for label in summary_info[dopant]["labels"]:
-                                    f.write(f"## {label}\n")
-                                    f.write(f"### energy_{label}_default\n")
-                                    f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}.png)\n")
+                                try:
+                                    for label in summary_info[dopant]["labels"]:
+                                        f.write(f"## {label}\n")
+                                        f.write(f"### energy_{label}_default\n")
+                                        f.write(f"![Alt text](dopant_{dopant}/defect/energy_{label}.png)\n")
+                                except KeyError:
+                                    pass
                     markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = True
                 else:
                     print("No such file: summary_info.json")

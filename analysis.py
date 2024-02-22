@@ -329,7 +329,7 @@ def analysis_defect(piseset, calc_info, analysis_info, num_process):
             print("defect calculations have not finished yet. So analysis of defect will be skipped.")
             return False
     except KeyError:
-        print("defect calculations have not finished yet. So analysis of defect will be skipped.")
+        print("defects are not calculated.")
         return False
 
     print("Analyzing defect.")
