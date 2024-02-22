@@ -86,23 +86,14 @@ class Search():
                 os.chdir(path)
 
                 try:
-                    with open('analysis_info.json') as f:
-                        analysis_info = json.load(f)
+                    with open('defect/defect_energy_summary.json') as f:
+                        defect_energy_summary = json.load(f)
+                        calculate_minimun_defect_formation_energy_at_vbm(defect_energy_summary, serach_condition)
+                        os.chdir("../../")
                 except FileNotFoundError:
-                    print(f"No such file: analysis_info.json")
+                    print(f"No such file: defect_energy_summary.json")
                     os.chdir("../../")
-                    continue
 
-                if not analysis_info["defect"]:
-                    print("Analysis of defect has not finished yet.")
-                    os.chdir("../../")
-                    continue
-                
-                with open('defect/defect_energy_summary.json') as f:
-                    defect_energy_summary = json.load(f)
-                calculate_minimun_defect_formation_energy_at_vbm(defect_energy_summary, serach_condition)
-
-                os.chdir("../../")
             else:
                 print(f"No such directory: {path}")
     
@@ -117,22 +108,14 @@ class Search():
                 os.chdir(path)
 
                 try:
-                    with open('analysis_info.json') as f:
-                        analysis_info = json.load(f)
+                    with open('defect/defect_energy_summary.json') as f:
+                        defect_energy_summary = json.load(f)
+                        calculate_minimun_defect_formation_energy_at_cbm(defect_energy_summary, serach_condition)
+                        os.chdir("../../")
                 except FileNotFoundError:
-                    print(f"No such file: analysis_info.json")
-                    continue
-
-                if not analysis_info["defect"]:
-                    print("Analysis of defect has not finished yet.")
+                    print(f"No such file: defect_energy_summary.json")
                     os.chdir("../../")
-                    continue
                 
-                with open('defect/defect_energy_summary.json') as f:
-                    defect_energy_summary = json.load(f)
-                calculate_minimun_defect_formation_energy_at_cbm(defect_energy_summary, serach_condition)
-
-                os.chdir("../../")
             else:
                 print(f"No such directory: {path}")
 

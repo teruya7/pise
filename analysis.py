@@ -245,7 +245,7 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
 
     os.chdir("../")
 
-    return check_analysis_done("unitcell.yaml")
+    return check_analysis_done("unitcell/unitcell.yaml")
 
 def analysis_cpd(target_material, piseset, calc_info, analysis_info):
     #cpdが解析済みかどうか確認
@@ -305,7 +305,7 @@ def analysis_cpd(target_material, piseset, calc_info, analysis_info):
     subprocess.run(["pydefect pc"], shell=True)
 
     os.chdir("../") 
-    return check_analysis_done("target_vertices.yaml")
+    return check_analysis_done("cpd/target_vertices.yaml")
 
 def analysis_defect(piseset, calc_info, analysis_info, num_process):
     #defectが解析済みかどうか確認
@@ -371,7 +371,7 @@ def analysis_defect(piseset, calc_info, analysis_info, num_process):
 
     os.chdir("../") 
         
-    return check_analysis_done("energy_A.pdf")
+    return check_analysis_done("defect/energy_A.pdf")
 
 def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, piseset):
     #dopantのcpdが解析済みかどうか確認
@@ -450,7 +450,7 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, pises
         subprocess.run(["pydefect pc"], shell=True)
     os.chdir("../../") 
         
-    return check_analysis_done("target_vertices.yaml")
+    return check_analysis_done(f"dopant_{dopant}/cpd/target_vertices.yaml")
 
 def analysis_dopant_defect(dopant, piseset, calc_info, analysis_info, num_process):
     #dopantのdefectが解析済みかどうか確認
@@ -527,7 +527,7 @@ def analysis_dopant_defect(dopant, piseset, calc_info, analysis_info, num_proces
 
     os.chdir("../../")
         
-    return check_analysis_done("energy_A.pdf")
+    return check_analysis_done(f"dopant_{dopant}/defect/energy_A.pdf")
 
 def analysis_surface(calc_info, analysis_info):
     #surfaceが解析済みかどうか確認
@@ -585,14 +585,14 @@ def analysis_surface(calc_info, analysis_info):
 
     os.chdir("../")
     
-    return check_analysis_done("band_alignment.pdf")
+    return check_analysis_done("surface/band_alignment.pdf")
 
 class Analysis():
     def __init__(self):
         piseset = PiseSet()
 
         #並列処理
-        num_process = int(cpu_count()*0.5)
+        num_process = int(cpu_count()*0.4)
         if piseset.parallel:
             print(f"num_process:{num_process}")
         else:

@@ -5,47 +5,43 @@ from pise_set import PiseSet
 from target import TargetHandler
 import json
 from doping import get_dopants_list
-from calculation import Calculation
 
 def submit_job(piseset, target):
-    #ジョブ数の制限を超えていないか確認
-    if piseset.num_jobs_command is not None:
-        num_jobs = subprocess.run([f"{piseset.num_jobs_command}"], capture_output=True, text=True, shell=True).stdout
-        try:
-            if int(num_jobs) >= int(piseset.limit_jobs):
-                print("The maximum number of calculations has been reached.")
-                return False
-        except ValueError:
-            pass
-
-    if os.path.isdir(target):
+    if os.path.isfile(f"{target}/ready_for_submission.txt"):
         os.chdir(target)
-        print(f"{target}:{num_jobs}")
-            
-        if os.path.isfile("ready_for_submission.txt"):
-            subprocess.run([f"{piseset.submit_command} run*.sh"], shell=True)
-            subprocess.run(["rm ready_for_submission.txt"], shell=True)
-        
-        #計算が収束していなかった時
-        elif os.path.isfile("POSCAR-10"):
-            print("Calculations have not converged. So the job submitted again.")
-            subprocess.run(["cp POSCAR-10 POSCAR"], shell=True)
-            subprocess.run(["rm -r OUTCAR-* progress-* POSCAR-* repeat-*"], shell=True)
-            subprocess.run([f"{piseset.submit_command} run*.sh"], shell=True)
-        else:
-            print("No ready_for_submission.txt")
+        subprocess.run([f"{piseset.submit_command} run*.sh"], shell=True)
+        subprocess.run(["rm ready_for_submission.txt"], shell=True)
         os.chdir("../")
-    return True
+        return True
+    #計算が収束していなかった時
+    elif os.path.isfile(f"{target}/POSCAR-10"):
+        os.chdir(target)
+        print("Calculations have not converged. So the job submitted again.")
+        subprocess.run(["cp POSCAR-10 POSCAR"], shell=True)
+        subprocess.run(["rm -r OUTCAR-* progress-* POSCAR-* repeat-*"], shell=True)
+        subprocess.run([f"{piseset.submit_command} run*.sh"], shell=True)
+        os.chdir("../")
+        return True
+    else:
+        return False
 
 def submit_jobs(path, piseset, calc_info_items):
     if not os.path.isdir(path):
+        print(f"No such directory: {path}")
         return
     
+    num_jobs = int(subprocess.run([f"{piseset.num_jobs_command}"], capture_output=True, text=True, shell=True).stdout)
+    print(f"num_jobs:{num_jobs}")
+
     os.chdir(path)
     for target, is_converged in calc_info_items:
+        limit_jobs = int(piseset.limit_jobs)
+        if num_jobs >= limit_jobs:
+            print("The maximum number of jobs that can be submitted has been reached.")
+            break
         if not is_converged:
-            if not submit_job(piseset, target):
-                break
+            if submit_job(piseset, target):
+                num_jobs += 1
     os.chdir("../")
 
 class Submission():
