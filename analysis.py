@@ -3,6 +3,7 @@ import subprocess
 import yaml
 import itertools
 import string
+import copy
 from pymatgen.core.composition import Composition
 from pymatgen.core.periodic_table import Element
 from pise_set import PiseSet
@@ -16,6 +17,7 @@ from common_function import get_label_from_chempotdiag
 from pydefect.chem_pot_diag.chem_pot_diag import RelativeEnergies, ChemPotDiagMaker, UnstableTargetError
 from multiprocessing import Pool, cpu_count
 
+#dopantのデータが消えないバグがある
 def make_cpd_and_vertices(target, elements_list):
     rel_energies = RelativeEnergies.from_yaml("relative_energies.yaml")
     elements = elements_list or Composition(target).chemical_system.split("-")
@@ -436,12 +438,13 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, pises
     if not os.path.isfile("relative_energies.yaml"):
         subprocess.run(["pydefect sre"], shell=True)
     if not os.path.isfile("target_vertices.yaml"):
-        elements = target_material.elements
-        elements.append(dopant)
+        #オブジェクトが参照渡しにならないようにdeepcopyを利用
+        elements_list = copy.deepcopy(target_material.elements)
+        elements_list.append(dopant)
         if hasattr(target_material, "name"):
-            make_cpd_and_vertices(target_material.name, elements)
+            make_cpd_and_vertices(target_material.name, elements_list)
         else:
-            make_cpd_and_vertices(target_material.formula_pretty, elements)
+            make_cpd_and_vertices(target_material.formula_pretty, elements_list)
     
     #target_verticesを修正する（pydefectにエラーがある）
     reduced_cpd(dopant)
