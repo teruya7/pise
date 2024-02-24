@@ -192,7 +192,7 @@ class Submission():
                 try:
                     submit_jobs("defect", self.piseset, calc_info["defect"].items())
                 except KeyError:
-                    pass
+                    print("No such directory: defect")
 
                 if os.path.isfile("pise_dopants_and_sites.yaml"):
                     dopants = get_dopants_list()
