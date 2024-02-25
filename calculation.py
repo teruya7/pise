@@ -110,6 +110,8 @@ def update_calc_info_parallel(first_layer, calc_info, cwd, num_process, dopant=N
             os.chdir(second_layer)
             dir_list = make_dir_list()
             p.imap(is_calc_converged, dir_list)
+            p.close()
+            p.join()
             for third_layer in dir_list:
                 write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_layer)
             os.chdir("../")
@@ -119,22 +121,20 @@ def update_calc_info_parallel(first_layer, calc_info, cwd, num_process, dopant=N
     if dopant is not None:
         dir_list = make_dir_list()
         p.imap(is_calc_converged, dir_list)
-
+        p.close()
+        p.join()
         for second_layer in dir_list:
             write_result_to_calc_info(calc_info, cwd, f"dopant_{dopant}", first_layer, second_layer)
-
         os.chdir("../")
         return calc_info
 
     dir_list = make_dir_list()
     p.imap(is_calc_converged, dir_list)
+    p.close()
+    p.join()
     for second_layer in dir_list:
         write_result_to_calc_info(calc_info, cwd, first_layer, second_layer)
     os.chdir("../")
-
-    # 並列処理の終了
-    p.close()
-    p.join()
 
     return calc_info
 
