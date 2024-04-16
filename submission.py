@@ -30,7 +30,10 @@ def submit_jobs(path, piseset, calc_info_items):
         print(f"No such directory: {path}")
         return
     
-    num_jobs = int(subprocess.run([f"{piseset.num_jobs_command}"], capture_output=True, text=True, shell=True).stdout)
+    try:
+        num_jobs = int(subprocess.run([f"{piseset.num_jobs_command}"], capture_output=True, text=True, shell=True).stdout)
+    except ValueError:
+        num_jobs = 0
     print(f"num_jobs:{num_jobs}")
 
     os.chdir(path)
@@ -169,7 +172,7 @@ class Submission():
                     surface_list = make_dir_list()
                     for surface in surface_list:
                         try:
-                            submit_jobs(surface, self.piseset, calc_info["surface"][surface][target].items())
+                            submit_jobs(surface, self.piseset, calc_info["surface"][surface].items())
                         except KeyError:
                             pass
                     os.chdir("../")

@@ -56,7 +56,6 @@ vise_analysis_command_unitcell_hybrid:  pydefect_vasp u -vb band/vasprun.xml -ob
 vise_yaml:
   outcar: OUTCAR-finish
   contcar: POSCAR-finish
-  overridden_potcar: Ga
   xc: null
   user_incar_settings:
     ENCUT: 400
@@ -69,7 +68,6 @@ vise_yaml:
 vise_surface_yaml:
   outcar: OUTCAR-finish
   contcar: POSCAR-finish
-  overridden_potcar: Ga
   xc: null
   user_incar_settings:
     ENCUT: 400

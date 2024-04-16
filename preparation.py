@@ -1,7 +1,7 @@
 from target import TargetHandler
-from calculation import Calculation, make_dir_list
+from common_function import make_dir_list
 from pise_set import PiseSet
-from database import Database
+from cpd import Cpd
 import os
 from collections import defaultdict
 import json
@@ -253,6 +253,40 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
 
     return True
 
+def preparation_cohp(piseset, calc_info, preparation_info):
+    if preparation_info["cohp"]:
+        print("Preparation of cohp has already finished.")
+        return True
+    
+    print("Preparing cohp vasp part.")
+    os.chdir("unitcell")
+    if not os.path.isdir("cohp"):
+        if piseset.is_hybrid[piseset.functional]:
+            prepare_vasp_inputs("cohp", piseset.vise_task_command_cohp, piseset.job_script_path, piseset.job_table["cohp_hybrid"])
+        else:
+            prepare_vasp_inputs("cohp", piseset.vise_task_command_cohp, piseset.job_script_path, piseset.job_table["cohp"])
+    
+    calc_info["unitcell"].setdefault("cohp", False)
+    if not calc_info["unitcell"]["cohp"]:
+        print("Caluculation of cohp has not finished yet. So preparing cohp will be skipped.")
+        os.chdir("../")
+        return False
+    
+    #cohpのvaspの計算が終わった後の処理
+    print(f"Preparing cohp lobster part.")
+    os.makedirs("lobster", exist_ok=True)
+    os.chdir("lobster")
+    subprocess.run(["cp ../POSCAR-finish CONTCAR"], shell=True)
+    subprocess.run(["cp ../OUTCAR-finish OUTCAR"], shell=True)
+    subprocess.run(["cp ../INCAR ."], shell=True)
+    subprocess.run(["cp ../KPOINTS ."], shell=True)
+    subprocess.run(["cp ../POTCAR ."], shell=True)
+    subprocess.run(["ln -s ../WAVECAR ./"], shell=True)
+    subprocess.run(["cp ../vasprun.xml ./"], shell=True)
+    prepare_job_script(piseset.job_script_path, piseset.job_table["lobster"])
+    
+    #lobsterinを作成
+    
 def preparation_band_nsc(piseset, calc_info, preparation_info):
     if preparation_info["band_nsc"]:
         print("Preparation of band_nsc has already finished.")
@@ -366,7 +400,9 @@ def preparation_defect(piseset, calc_info, preparation_info, num_process):
         return False
     
     imaginary_phonon_gamma = check_imaginary_phonon(piseset)
-    if imaginary_phonon_gamma > 1:
+    imaginary_phonon_gamma_threshold = 1
+    if imaginary_phonon_gamma > imaginary_phonon_gamma_threshold:
+        subprocess.run(["touch imaginary_phonon_gamma.txt"], shell=True)
         print(f"imaginary_phonon_gamma: {imaginary_phonon_gamma}. This material may be unstable.")
         return True
     
@@ -714,7 +750,7 @@ class Preparation():
 
         for target in piseset.target_info:
             target_material = TargetHandler(target)
-            cpd_database = Database()
+            cpd_database = Cpd()
             path = target_material.make_path(piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
@@ -739,6 +775,10 @@ class Preparation():
                 if piseset.nsc and not piseset.sc_dd_hybrid:
                     preparation_info.setdefault("band_nsc", False)
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
+                
+                if piseset.cohp:
+                    preparation_info.setdefault("cohp", False)
+                    preparation_info["cohp"] = preparation_cohp(piseset, calc_info, preparation_info)
 
                 if piseset.hydrogen:
                     preparation_info.setdefault("hydrogen_interstitial_sites", False)

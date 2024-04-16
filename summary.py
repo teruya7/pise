@@ -32,10 +32,15 @@ class Summury():
                 os.chdir(path)
 
                 if not os.path.isfile("analysis_info.json"):
-                    print(f"No such directory: analysis_info.json. So making summary will be skipped.")
+                    print(f"No such file: analysis_info.json. So making summary will be skipped.")
                     os.chdir("../../")
                     continue
                 
+                if not os.path.isfile("defect/supercell_info.json"):
+                    print(f"No such directory: defect.")
+                    os.chdir("../../")
+                    continue
+
                 with open('analysis_info.json') as f:
                     analysis_info = json.load(f)
 
@@ -54,6 +59,8 @@ class Summury():
                 summary_info["material_id"] = target_material.material_id
                 if piseset.functional == "pbesol":
                     summary_info["functional"] = "pbesol+U_nsc_dd-hybrid"
+                elif piseset.functional == "pbe0":
+                    summary_info["functional"] = "pbe0_dd-hybrid"
                 else:
                     summary_info["functional"] = piseset.functional
 

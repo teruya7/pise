@@ -11,6 +11,7 @@ from pymatgen.io.vasp.outputs import Vasprun, Locpot, VolumetricData, Outcar
 
 #無極性かつ組成がズレ表面を対象としていることに注意
 def calculation_surface_energy(surface_target_info):
+    print("Calculating surface energy.")
     #bulkの計算結果をを取得
     bulk_structure = Structure.from_file("../unitcell/opt/POSCAR-finish")
     bulk_vasprun = Vasprun("../unitcell/opt/vasprun.xml")
@@ -62,6 +63,7 @@ def calculation_surface_energy(surface_target_info):
             json.dump(surface_energy_info, f, indent=4)
 
 def plot_averaged_locpot(surface_energy_info):
+    print("Plotting averaged locpot.")
     #repeatのファイル名の取得
     path = Path('./')
     for repeat in path.glob('repeat-*'):
@@ -148,6 +150,7 @@ def plot_averaged_locpot(surface_energy_info):
     plt.close()
 
 def plot_band_alignment(band_alignment_summary_info):
+    print("Plotting band alignment.")
     c = getcontext()
     c.prec = 3
     c.rounding = ROUND_HALF_UP
@@ -164,8 +167,12 @@ def plot_band_alignment(band_alignment_summary_info):
     ax.set_ylim([y_min, y_max])
 
     for n, band_alignment_info in enumerate(band_alignment_summary_info):
-        ax.bar(str(n) + "-" + band_alignment_info["target"], band_alignment_info["vbm_from_vacuum"]-y_min, bottom=y_min, color="lightblue", width=0.6)
-        ax.bar(str(n) + "-" + band_alignment_info["target"], y_max-band_alignment_info["cbm_from_vacuum"], bottom=band_alignment_info["cbm_from_vacuum"], color="lightgreen", width=0.6)
+        if band_alignment_info["surface_energy_min"]:
+            ax.bar(str(n) + "-" + band_alignment_info["target"], band_alignment_info["vbm_from_vacuum"]-y_min, bottom=y_min, color="yellow", width=0.6)
+            ax.bar(str(n) + "-" + band_alignment_info["target"], y_max-band_alignment_info["cbm_from_vacuum"], bottom=band_alignment_info["cbm_from_vacuum"], color="red", width=0.6)
+        else:
+            ax.bar(str(n) + "-" + band_alignment_info["target"], band_alignment_info["vbm_from_vacuum"]-y_min, bottom=y_min, color="lightblue", width=0.6)
+            ax.bar(str(n) + "-" + band_alignment_info["target"], y_max-band_alignment_info["cbm_from_vacuum"], bottom=band_alignment_info["cbm_from_vacuum"], color="lightgreen", width=0.6)
         plt.text(n, band_alignment_info["vbm_from_vacuum"]-text_offset, -Decimal(band_alignment_info["vbm_from_vacuum"]), ha="center", va="top")
         plt.text(n, band_alignment_info["cbm_from_vacuum"]+text_offset, -Decimal(band_alignment_info["cbm_from_vacuum"]), ha="center", va="bottom")
 

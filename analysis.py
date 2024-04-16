@@ -392,21 +392,22 @@ def analysis_dopant_cpd(dopant, target_material, calc_info, analysis_info, pises
         return False
 
     #データベースからデータを取得
-    if os.path.isfile(f'dopant_{dopant}/cpd/competing_phases_info.json'):
-        with open(f'dopant_{dopant}/cpd/competing_phases_info.json') as f:
-            competing_phases_info = json.load(f)
-        for competing_phase in competing_phases_info["competing_phases"]:
-            try:
-                if calc_info[f"dopant_{dopant}"]["cpd"][competing_phase]: #既にデータがある場合
-                    pass
-                else: #データはあるが計算が完了しておらず、データベースからデータを取得したい場合
+    if not piseset.is_hybrid[piseset.functional]:
+        if os.path.isfile(f'dopant_{dopant}/cpd/competing_phases_info.json'):
+            with open(f'dopant_{dopant}/cpd/competing_phases_info.json') as f:
+                competing_phases_info = json.load(f)
+            for competing_phase in competing_phases_info["competing_phases"]:
+                try:
+                    if calc_info[f"dopant_{dopant}"]["cpd"][competing_phase]: #既にデータがある場合
+                        pass
+                    else: #データはあるが計算が完了しておらず、データベースからデータを取得したい場合
+                        subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
+                        if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
+                            calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
+                except KeyError: #まだデータベースからデータを取得していない場合
                     subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
                     if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
                         calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
-            except KeyError: #まだデータベースからデータを取得していない場合
-                subprocess.run([f"cp -r {piseset.path_to_cpd_database}/{piseset.functional}/{competing_phase} dopant_{dopant}/cpd/"], shell=True)
-                if os.path.isfile(f"dopant_{dopant}/cpd/{competing_phase}/is_converged.txt"):
-                    calc_info[f"dopant_{dopant}"]["cpd"][competing_phase] = True
         
         with open("calc_info.json", "w") as f:
             json.dump(calc_info, f, indent=4)
@@ -553,7 +554,7 @@ def analysis_surface(calc_info, analysis_info):
     os.chdir("surface") 
     with open('surface_target_info.json') as f:
         surface_target_info = json.load(f)
-
+    
     calculation_surface_energy(surface_target_info)
 
     band_alignment_summary_info = []
@@ -573,6 +574,7 @@ def analysis_surface(calc_info, analysis_info):
         band_alignment_dict["target"] = surface_energy_info["target"]
         band_alignment_dict["vbm_from_vacuum"] = surface_energy_info["vbm_from_vacuum"]
         band_alignment_dict["cbm_from_vacuum"] = surface_energy_info["cbm_from_vacuum"]
+        band_alignment_dict["surface_energy_min"] = surface_energy_info["surface_energy_min"]
         band_alignment_summary_info.append(band_alignment_dict)
 
         with open("surface_energy_info.json", "w") as f:

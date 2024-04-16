@@ -8,9 +8,10 @@ from summary import Summury
 from markdown import Markdown
 from doping import Doping
 from calculation import Calculation
-from database import Database
+from cpd import Cpd
 from search import Search
 from error_handler import ErrorHandler
+from vasp_speed_test import VaspSpeedTest
 
 Fire({
     "tar": Target,
@@ -22,7 +23,8 @@ Fire({
     "submit": Submission,
     "md": Markdown,
     "dp": Doping,
-    "db": Database,
+    "cpd": Cpd,
     "search": Search,
-    "eh": ErrorHandler
+    "eh": ErrorHandler,
+    "sp": VaspSpeedTest
     })

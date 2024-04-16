@@ -8,8 +8,8 @@ class PiseSet():
         #pise_defaults.yamからスパコンの情報とviseのコマンド設定を読み込む
         home = os.environ['HOME']
         with open(f"{home}/.pise_defaults.yaml") as file:
-            #スパコンの環境変数
             pise_defaults = yaml.safe_load(file)
+            #スパコンの環境変数
             self.limit_jobs = pise_defaults["limit_jobs"]
             self.submit_command = pise_defaults["submit_command"]
             self.num_jobs_command = pise_defaults["num_jobs_command"]
@@ -41,6 +41,7 @@ class PiseSet():
             self.vise_task_command_defect = pise_defaults["vise_task_command_defect"]
             self.vise_task_command_defect_hydrogen = pise_defaults["vise_task_command_defect_hydrogen"]
             self.vise_task_command_surface = pise_defaults["vise_task_command_surface"]
+            self.vise_task_command_cohp = pise_defaults["vise_task_command_cohp"]
 
             #vise_analysis_command
             self.vise_analysis_command_plot_band = pise_defaults["vise_analysis_command_plot_band"]
@@ -67,6 +68,7 @@ class PiseSet():
             self.functional = pise["functional"]
             self.nsc = pise["nsc"]
             self.abs = pise["abs"]
+            self.cohp = pise["cohp"]
             self.surface = pise["surface"]
             self.parallel = pise["parallel"]
             self.hydrogen = pise["hydrogen"]

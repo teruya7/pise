@@ -12,12 +12,12 @@ from multiprocessing import Pool, cpu_count
 
 def is_calc_converged(path):
     if os.path.isfile(f"{path}/is_converged.txt"):
-        return 
+        return True
     
     if path == "band_nsc" and os.path.isfile(f"{path}/vasprun.xml"):
         touch = pathlib.Path(f"{path}/is_converged.txt")
         touch.touch()
-        return
+        return True
     
     if os.path.isfile(f"{path}/vasprun.xml"):
         try:
@@ -25,11 +25,11 @@ def is_calc_converged(path):
             if vasprun.converged:
                 touch = pathlib.Path(f"{path}/is_converged.txt")
                 touch.touch()
-                return 
+                return True
         except xml.etree.ElementTree.ParseError:
-            pass
+            return False
         except AttributeError:
-            pass
+            return False
 
 def write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_layer=None):
     if third_layer is None:
@@ -38,6 +38,7 @@ def write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_l
                 if os.path.isfile(f"{second_layer}/is_converged.txt"):
                     calc_info[first_layer][second_layer] = True
                 else:
+                    calc_info[first_layer][second_layer] = False
                     print(f"{cwd}/{first_layer}/{second_layer}")
         #keyに存在していない場合
         except KeyError:
@@ -53,6 +54,7 @@ def write_result_to_calc_info(calc_info, cwd, first_layer, second_layer, third_l
                 if os.path.isfile(f"{third_layer}/is_converged.txt"):
                     calc_info[first_layer][second_layer][third_layer] = True
                 else:
+                    calc_info[first_layer][second_layer][third_layer] = False
                     print(f"{cwd}/{first_layer}/{second_layer}/{third_layer}")
         except KeyError:
             if os.path.isfile(f"{third_layer}/is_converged.txt"):
@@ -109,6 +111,7 @@ def update_calc_info_parallel(first_layer, calc_info, cwd, num_process, dopant=N
         for second_layer in surface_list:
             os.chdir(second_layer)
             dir_list = make_dir_list()
+            p = Pool(processes=num_process)
             p.imap(is_calc_converged, dir_list)
             p.close()
             p.join()

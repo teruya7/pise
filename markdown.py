@@ -127,6 +127,11 @@ class Markdown():
             path = target_material.make_path(piseset.functional)
             if os.path.isdir(path):
                 os.chdir(path)
+
+                if not os.path.isfile("defect/supercell_info.json"):
+                    print(f"No such directory: defect.")
+                    os.chdir("../../")
+                    continue
             
                 if os.path.isfile('summary_info.json'):
                     print("Loading summary_info.json")
