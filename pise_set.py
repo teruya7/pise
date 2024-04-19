@@ -31,6 +31,7 @@ class PiseSet():
             #vise_task_command
             self.vise_task_command_opt = pise_defaults["vise_task_command_opt"]
             self.vise_task_command_band = pise_defaults["vise_task_command_band"]
+            self.vise_task_command_band_hybrid = pise_defaults["vise_task_command_band_hybrid"]
             self.vise_task_command_band_nsc = pise_defaults["vise_task_command_band_nsc"]
             self.vise_task_command_dos = pise_defaults["vise_task_command_dos"]
             self.vise_task_command_dos_accurate = pise_defaults["vise_task_command_dos_accurate"]

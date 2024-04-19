@@ -53,7 +53,7 @@ class VaspSpeedTest():
         #POSCARの作成
         make_poscar_MgO()
 
-    def pre(self, test_name, path_to_jobscript):
+    def pre(self, test_name, path_to_jobscript, num_core):
         
         piseset = PiseSet()
 
@@ -62,6 +62,10 @@ class VaspSpeedTest():
             os.makedirs(f"{test_name}/{piseset.functional}", exist_ok=True)
             os.chdir(f"{test_name}/{piseset.functional}")
 
+            num_core_info = {"num_core": num_core}
+            with open("num_core_info.json", "w") as f:
+                json.dump(num_core_info, f, indent=4)
+            
             make_vise_yaml(piseset)
 
             preparation_supercell(2, 2, 2, path_to_jobscript, piseset.submit_command)
@@ -69,13 +73,26 @@ class VaspSpeedTest():
 
             os.chdir("../../")
 
-    def time(self, test_name):
+    def time(self, test_name, path_to_base_time_info=None):
         piseset = PiseSet()
 
+        if path_to_base_time_info is not None:
+            with open(path_to_base_time_info) as f:
+                base_time_info = json.load(f)
+            base_num_core = base_time_info["num_core"]
+            
         if os.path.isdir(f"{test_name}/{piseset.functional}"):
             os.chdir(f"{test_name}/{piseset.functional}")
 
             time_info = defaultdict(lambda:defaultdict(dict))
+
+            with open('num_core_info.json') as f:
+                num_core_info = json.load(f)
+            num_core = num_core_info["num_core"]
+            time_info["num_core"] = num_core
+
+            if path_to_base_time_info is not None:
+                print(f"core_ratio: {num_core / base_num_core}")
 
             supercell_list = make_dir_list()
             for supercell in supercell_list:
@@ -86,11 +103,17 @@ class VaspSpeedTest():
                         outcar = Outcar(f"{defect}/OUTCAR")
                         try:
                             elapsed_time = outcar.run_stats['Elapsed time (sec)']
-                            print(f"{supercell}/{defect}: {elapsed_time} s")
+                            if path_to_base_time_info is not None:
+                                time_ratio = '{:.2g}'.format(base_time_info[supercell][defect] / elapsed_time)
+                                print(f"{supercell}/{defect}: {elapsed_time} s, {time_ratio}")
+                            else:
+                                print(f"{supercell}/{defect}: {elapsed_time} s")
                             time_info[supercell][defect] = elapsed_time
                         except KeyError:
                             print(f"{supercell}/{defect}: null")
                             time_info[supercell][defect] = None
+                    else:
+                        print(f"No such file: {defect}/OUTCAR")
                 os.chdir("../")
 
             #time_info.jsonの保存

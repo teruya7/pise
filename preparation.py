@@ -183,8 +183,11 @@ def preparation_unitcell_sc_dd_hybrid(piseset, calc_info, preparation_info):
             with open("sc_dd_hybrid_aexx.json", "w") as f:
                 json.dump(sc_dd_hybrid_aexx, f, indent=4)
 
-            prepare_vasp_inputs("band", piseset.vise_task_command_band, piseset.job_script_path, piseset.job_table["band_hybrid"])
+            prepare_vasp_inputs("band", piseset.vise_task_command_band_hybrid, piseset.job_script_path, piseset.job_table["band_hybrid"])
             prepare_vasp_inputs("dos", piseset.vise_task_command_dos, piseset.job_script_path, piseset.job_table["dos_hybrid"])
+            if piseset.abs:
+                prepare_vasp_inputs("abs", piseset.vise_task_command_abs, piseset.job_script_path, piseset.job_table["abs_hybrid"])
+
             os.chdir("../")
             return True
         else:
@@ -231,7 +234,7 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
     os.chdir("unitcell")
 
     if piseset.is_hybrid[piseset.functional]:
-        prepare_vasp_inputs("band", piseset.vise_task_command_band, piseset.job_script_path, piseset.job_table["band_hybrid"])
+        prepare_vasp_inputs("band", piseset.vise_task_command_band_hybrid, piseset.job_script_path, piseset.job_table["band_hybrid"])
         prepare_vasp_inputs("dos", piseset.vise_task_command_dos, piseset.job_script_path, piseset.job_table["dos_hybrid"])
         prepare_vasp_inputs("dielectric", piseset.vise_task_command_dielectric_hybrid, piseset.job_script_path, piseset.job_table["dielectric_hybrid"])
     else:
