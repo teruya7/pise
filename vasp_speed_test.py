@@ -19,7 +19,7 @@ def preparation_supercell(x, y, z, path_to_jobscript, submit_command):
     for target_dir in defect_dir_list:
         os.chdir(target_dir)
         subprocess.run([f"cp {path_to_jobscript} ."], shell=True)
-        subprocess.run(["vise vs -t defect -uis ALGO Normal SYMPREC 1e-4 NSW 1 --options only_even_num_kpts True"], shell=True)
+        subprocess.run(["vise vs -t defect -uis ALGO Normal SYMPREC 1e-4 NELM 1 --options only_even_num_kpts True"], shell=True)
         subprocess.run([f"{submit_command} *.sh"], shell=True)
         os.chdir("../")
 
@@ -72,6 +72,8 @@ class VaspSpeedTest():
             preparation_supercell(3, 3, 3, path_to_jobscript, piseset.submit_command)
 
             os.chdir("../../")
+        else:
+            print(f"{test_name} already exists.")
 
     def time(self, test_name, path_to_base_time_info=None):
         piseset = PiseSet()
