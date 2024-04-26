@@ -85,7 +85,8 @@ class VaspSpeedTest():
             for supercell in supercell_list:
                 os.chdir(supercell)
                 defect_list = make_dir_list()
-                for defect in defect_list:
+                defect_list_sorted = sorted(defect_list)
+                for defect in defect_list_sorted:
                     os.chdir(defect)
                     if os.path.isfile("OUTCAR"):
                         outcar = Outcar("OUTCAR")
@@ -93,11 +94,11 @@ class VaspSpeedTest():
                             elapsed_time = outcar.run_stats['Elapsed time (sec)']    
                             elapsed_time_info[supercell][defect] = elapsed_time
 
-                            one_electronic_step_time = subprocess.run(["grep LOOP OUTCAR | awk '{print$7}' | awk 'NR==1'"], capture_output=True, text=True, shell=True).stdout
+                            one_electronic_step_time = subprocess.run(["grep LOOP OUTCAR | awk '{print$7}' | awk 'NR==5'"], capture_output=True, text=True, shell=True).stdout
                             one_electronic_step_time = one_electronic_step_time.replace("\n", "")
                             one_electronic_step_time_info[supercell][defect] = one_electronic_step_time
 
-                            print(f"{supercell}/{defect}: {elapsed_time}, {one_electronic_step_time}")
+                            print(f"{supercell}/{defect}, {elapsed_time}, {one_electronic_step_time}")
                         except KeyError:
                             elapsed_time_info[supercell][defect] = None
                             one_electronic_step_time_info[supercell][defect] = None
