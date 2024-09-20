@@ -9,6 +9,7 @@ class PiseSet():
         home = os.environ['HOME']
         with open(f"{home}/.pise_defaults.yaml") as file:
             pise_defaults = yaml.safe_load(file)
+            self.api_key = pise_defaults["MY_API_KEY"]
             #スパコンの環境変数
             self.limit_jobs = pise_defaults["limit_jobs"]
             self.submit_command = pise_defaults["submit_command"]
@@ -69,7 +70,6 @@ class PiseSet():
             self.functional = pise["functional"]
             self.nsc = pise["nsc"]
             self.abs = pise["abs"]
-            self.cohp = pise["cohp"]
             self.surface = pise["surface"]
             self.parallel = pise["parallel"]
             self.hydrogen = pise["hydrogen"]

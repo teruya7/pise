@@ -12,6 +12,7 @@ from cpd import Cpd
 from search import Search
 from error_handler import ErrorHandler
 from vasp_speed_test import VaspSpeedTest
+from collect import Collect
 
 Fire({
     "tar": Target,
@@ -26,5 +27,6 @@ Fire({
     "cpd": Cpd,
     "search": Search,
     "eh": ErrorHandler,
-    "sp": VaspSpeedTest
+    "sp": VaspSpeedTest,
+    "col": Collect
     })

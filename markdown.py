@@ -13,9 +13,9 @@ def write_primitivecell_info(markdown, summary_info):
     markdown.write("![Alt text](unitcell/opt/primitivecell.png)\n")
     markdown.write("|  unitcell (primitive)  |    |\n")
     markdown.write("| ---- | ---- |\n")
-    markdown.write(f'|  a  |  {summary_info["POSCAR"]["a"]}  |\n')
-    markdown.write(f'|  b  |  {summary_info["POSCAR"]["b"]}  |\n')
-    markdown.write(f'|  c  |  {summary_info["POSCAR"]["c"]}  |\n')
+    markdown.write(f'|  a  |  {summary_info["POSCAR"]["a"]} a (Ang.) |\n')
+    markdown.write(f'|  b  |  {summary_info["POSCAR"]["b"]} a (Ang.) |\n')
+    markdown.write(f'|  c  |  {summary_info["POSCAR"]["c"]} a (Ang.) |\n')
     markdown.write(f'|  n_atoms  |  {summary_info["POSCAR"]["n_atoms"]}  |\n')
     markdown.write(f'|  symmetry  |  {summary_info["symmetry"]}  |\n')
     markdown.write('<div style="page-break-before:always"></div>\n\n')
@@ -51,7 +51,6 @@ def write_dielectric_info(markdown, summary_info):
     markdown.write(f'|  ion_dielectric_const_x |  {summary_info["ion_dielectric_const"]["x"]}  |\n')
     markdown.write(f'|  ion_dielectric_const_y |  {summary_info["ion_dielectric_const"]["y"]}  |\n')
     markdown.write(f'|  ion_dielectric_const_z |  {summary_info["ion_dielectric_const"]["z"]}  |\n')
-    # markdown.write('<div style="page-break-before:always"></div>\n\n')
 
 def write_effective_mass_info(markdown, summary_info):
     markdown.write("## effective_mass\n")
@@ -65,6 +64,22 @@ def write_effective_mass_info(markdown, summary_info):
     markdown.write(f'|  n_x |  {summary_info["n"]["x"]}  |\n')
     markdown.write(f'|  n_y |  {summary_info["n"]["y"]}  |\n')
     markdown.write(f'|  n_z |  {summary_info["n"]["z"]}  |\n')
+
+def write_hydrogen_atom_model_info(markdown, summary_info):
+    ele_dielectric_constant = (float(summary_info["ele_dielectric_const"]["x"]) + float(summary_info["ele_dielectric_const"]["y"]) + float(summary_info["ele_dielectric_const"]["z"])) / 3
+    ion_dielectric_constant = (float(summary_info["ion_dielectric_const"]["x"]) + float(summary_info["ion_dielectric_const"]["y"]) + float(summary_info["ion_dielectric_const"]["z"])) / 3
+    dielectric_constant = ele_dielectric_constant + ion_dielectric_constant
+    
+    hole_effective_mass = (float(summary_info["p"]["x"]) + float(summary_info["p"]["y"]) + float(summary_info["p"]["z"])) / 3
+    electron_effective_mass = (float(summary_info["n"]["x"]) + float(summary_info["n"]["y"]) + float(summary_info["n"]["z"])) / 3
+    donor = format(13.6 / dielectric_constant / dielectric_constant * electron_effective_mass * 1000, ".3f")
+    acceptor = format(13.6 / dielectric_constant / dielectric_constant * hole_effective_mass * 1000, ".3f")
+                           
+    markdown.write("## hydrogen_atom_model\n")
+    markdown.write("|    |    |\n")
+    markdown.write("| ---- | ---- |\n")
+    markdown.write(f'|  donor |  {donor} meV |\n')
+    markdown.write(f'|  acceptor |  {acceptor} meV  |\n')
     markdown.write('<div style="page-break-before:always"></div>\n\n')
 
 def write_dos_info(markdown):
@@ -74,7 +89,7 @@ def write_dos_info(markdown):
 
 def write_abs_info(markdown):
     markdown.write("## Absorption coefficient\n")
-    markdown.write("![Alt text](unitcell/abs/absorption_coeff.png)\n")
+    markdown.write("![Alt text](unitcell/abs/abs.png)\n")
     markdown.write('<div style="page-break-before:always"></div>\n\n')
 
 def write_supercell_info(markdown, summary_info):
@@ -82,9 +97,9 @@ def write_supercell_info(markdown, summary_info):
     markdown.write("![Alt text](defect/supercell.png)\n")
     markdown.write("|  supercell  |    |\n")
     markdown.write("| ---- | ---- |\n")
-    markdown.write(f'|  a  |  {summary_info["SPOSCAR"]["a"]}  |\n')
-    markdown.write(f'|  b  |  {summary_info["SPOSCAR"]["b"]}  |\n')
-    markdown.write(f'|  c  |  {summary_info["SPOSCAR"]["c"]}  |\n')
+    markdown.write(f'|  a  |  {summary_info["SPOSCAR"]["a"]} a (Ang.) |\n')
+    markdown.write(f'|  b  |  {summary_info["SPOSCAR"]["b"]} a (Ang.) |\n')
+    markdown.write(f'|  c  |  {summary_info["SPOSCAR"]["c"]} a (Ang.) |\n')
     markdown.write(f'|  n_atoms  |  {summary_info["SPOSCAR"]["n_atoms"]}  |\n')
     markdown.write(f'|  kpoints  |  {summary_info["KPOINTS"]["kpoints"]}  |\n')
     markdown.write(f'|  shift  |  {summary_info["KPOINTS"]["shift"]}  |\n')
@@ -92,6 +107,16 @@ def write_supercell_info(markdown, summary_info):
 
 def write_defect_info(markdown):
     with open("defect/defect_in.yaml") as file:
+        defect_in = yaml.safe_load(file)
+    markdown.write('## defect_in.yaml\n')
+    markdown.write("|  defect  |  charge  |\n")
+    markdown.write("| ---- | ---- |\n")
+    for defect, charge in defect_in.items():
+        markdown.write(f'|  {defect}  |  {charge}  |\n')
+    markdown.write(f'<div style="page-break-before:always"></div>\n\n')
+
+def write_dopant_defect_info(markdown, dopant):
+    with open(f"dopant_{dopant}/defect/defect_in.yaml") as file:
         defect_in = yaml.safe_load(file)
     markdown.write('## defect_in.yaml\n')
     markdown.write("|  defect  |  charge  |\n")
@@ -120,7 +145,6 @@ class Markdown():
         for target in piseset.target_info:
             target_material = TargetHandler(target)
             path = target_material.make_path(piseset.functional)
-            markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = False
             if os.path.isdir(path):
                 os.chdir(path)
 
@@ -144,6 +168,7 @@ class Markdown():
                     write_band_info(markdown, summary_info, piseset)
                     write_dielectric_info(markdown, summary_info)
                     write_effective_mass_info(markdown, summary_info)
+                    write_hydrogen_atom_model_info(markdown, summary_info)
                     write_dos_info(markdown)
 
                     if piseset.abs:
@@ -153,8 +178,6 @@ class Markdown():
                         write_band_alignment_info(markdown)
                         
                     write_supercell_info(markdown, summary_info)
-
-                    
                     write_defect_info(markdown)
 
                     markdown.write(f"![Alt text](cpd/cpd.png)\n")
@@ -167,6 +190,7 @@ class Markdown():
                         dopants = get_dopants_list()
                         for dopant in dopants:
                             markdown.write(f"# dopant_{dopant}\n")
+                            write_dopant_defect_info(markdown, dopant)
                             markdown.write(f"![Alt text](dopant_{dopant}/cpd/cpd.png)\n")
                             markdown.write(f'<div style="page-break-before:always"></div>\n\n')
                             try:
@@ -174,7 +198,7 @@ class Markdown():
                                     write_dopant_defect_formation_info(markdown, label, dopant)
                             except KeyError:
                                 pass
-                markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = True
+                markdown_info[f"{target_material.formula_pretty}_{target_material.material_id}"] = summary_info['functional']
 
                     
 

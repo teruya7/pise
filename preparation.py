@@ -12,6 +12,13 @@ import yaml
 from pymatgen.io.vasp.outputs import Vasprun
 from hydrogen.hydrogen import get_local_extrema
 from multiprocessing import Pool, cpu_count
+from mp_api.client import MPRester
+
+def get_poscar_from_MP(api_key, material_id):
+    with MPRester(api_key) as mpr:
+        MPDataDoc = mpr.summary.search(material_ids=[material_id], fields=["structure"])
+    structure = MPDataDoc[0].structure
+    structure.to("POSCAR")
 
 #これは使わないように計算を進めたい
 def remove_from_competing_phases(target, competing_phases_list):
@@ -114,13 +121,14 @@ def preparation_opt(piseset, material_id, formula_pretty):
         vise_yaml["xc"] = functional
         if piseset.is_hybrid[functional] and not piseset.sc_dd_hybrid:
             vise_yaml["user_incar_settings"].setdefault("AEXX", piseset.aexx)
+            vise_yaml["options"]["set_hubbard_u"] = False
         with open("vise.yaml", "w") as f:
             yaml.dump(vise_yaml, f, sort_keys=False)
 
         os.chdir("unitcell/opt")
         if material_id != "None":
             if not check_viseset_done():
-                subprocess.run([f"vise gp -m {material_id}"], shell=True)
+                get_poscar_from_MP(piseset.api_key, material_id)
                 if piseset.is_hybrid[functional]:
                     prepare_job_script(piseset.job_script_path, piseset.job_table["opt_hybrid"])
                 else:
@@ -182,6 +190,11 @@ def preparation_unitcell_sc_dd_hybrid(piseset, calc_info, preparation_info):
             sc_dd_hybrid_aexx[int(max(sc_dd_hybrid_aexx))+1] = aexx
             with open("sc_dd_hybrid_aexx.json", "w") as f:
                 json.dump(sc_dd_hybrid_aexx, f, indent=4)
+            
+            aexx_dict = defaultdict(dict)
+            aexx_dict["aexx"] = aexx
+            with open("../aexx.json", "w") as f:
+                json.dump(aexx_dict, f, indent=4)
 
             prepare_vasp_inputs("band", piseset.vise_task_command_band_hybrid, piseset.job_script_path, piseset.job_table["band_hybrid"])
             prepare_vasp_inputs("dos", piseset.vise_task_command_dos, piseset.job_script_path, piseset.job_table["dos_hybrid"])
@@ -255,40 +268,6 @@ def preparation_unitcell(piseset, calc_info, preparation_info):
     os.chdir("../")
 
     return True
-
-def preparation_cohp(piseset, calc_info, preparation_info):
-    if preparation_info["cohp"]:
-        print("Preparation of cohp has already finished.")
-        return True
-    
-    print("Preparing cohp vasp part.")
-    os.chdir("unitcell")
-    if not os.path.isdir("cohp"):
-        if piseset.is_hybrid[piseset.functional]:
-            prepare_vasp_inputs("cohp", piseset.vise_task_command_cohp, piseset.job_script_path, piseset.job_table["cohp_hybrid"])
-        else:
-            prepare_vasp_inputs("cohp", piseset.vise_task_command_cohp, piseset.job_script_path, piseset.job_table["cohp"])
-    
-    calc_info["unitcell"].setdefault("cohp", False)
-    if not calc_info["unitcell"]["cohp"]:
-        print("Caluculation of cohp has not finished yet. So preparing cohp will be skipped.")
-        os.chdir("../")
-        return False
-    
-    #cohpのvaspの計算が終わった後の処理
-    print(f"Preparing cohp lobster part.")
-    os.makedirs("lobster", exist_ok=True)
-    os.chdir("lobster")
-    subprocess.run(["cp ../POSCAR-finish CONTCAR"], shell=True)
-    subprocess.run(["cp ../OUTCAR-finish OUTCAR"], shell=True)
-    subprocess.run(["cp ../INCAR ."], shell=True)
-    subprocess.run(["cp ../KPOINTS ."], shell=True)
-    subprocess.run(["cp ../POTCAR ."], shell=True)
-    subprocess.run(["ln -s ../WAVECAR ./"], shell=True)
-    subprocess.run(["cp ../vasprun.xml ./"], shell=True)
-    prepare_job_script(piseset.job_script_path, piseset.job_table["lobster"])
-    
-    #lobsterinを作成
     
 def preparation_band_nsc(piseset, calc_info, preparation_info):
     if preparation_info["band_nsc"]:
@@ -596,8 +575,15 @@ def preparation_surface(piseset, calc_info, preparation_info):
     functional = piseset.functional
     vise_surface_yaml = piseset.vise_surface_yaml
     vise_surface_yaml["xc"] = functional
+
     if piseset.is_hybrid[functional]:
-        vise_surface_yaml["user_incar_settings"].setdefault("AEXX", piseset.aexx)
+        if piseset.sc_dd_hybrid:
+            with open('../aexx.json') as f:
+                aexx = json.load(f)
+            vise_surface_yaml["user_incar_settings"].setdefault("AEXX", aexx["aexx"])
+        else:
+            vise_surface_yaml["user_incar_settings"].setdefault("AEXX", piseset.aexx)
+    
     with open("vise.yaml", "w") as f:
         yaml.dump(vise_surface_yaml, f, sort_keys=False)
     
@@ -778,10 +764,6 @@ class Preparation():
                 if piseset.nsc and not piseset.sc_dd_hybrid:
                     preparation_info.setdefault("band_nsc", False)
                     preparation_info["band_nsc"] = preparation_band_nsc(piseset, calc_info, preparation_info)
-                
-                if piseset.cohp:
-                    preparation_info.setdefault("cohp", False)
-                    preparation_info["cohp"] = preparation_cohp(piseset, calc_info, preparation_info)
 
                 if piseset.hydrogen:
                     preparation_info.setdefault("hydrogen_interstitial_sites", False)

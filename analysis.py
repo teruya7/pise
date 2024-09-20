@@ -16,6 +16,10 @@ from surface import plot_band_alignment, calculation_surface_energy, plot_averag
 from common_function import get_label_from_chempotdiag
 from pydefect.chem_pot_diag.chem_pot_diag import RelativeEnergies, ChemPotDiagMaker, UnstableTargetError
 from multiprocessing import Pool, cpu_count
+from vise.analyzer.vasp.plot_band import BandPlotInfoFromVasp
+from vise.analyzer.plot_band import BandMplPlotter
+from pymatgen.io.vasp import Vasprun, Outcar
+from vise.analyzer.vasp.band_edge_properties import VaspBandEdgeProperties
 
 #dopantのデータが消えないバグがある
 def make_cpd_and_vertices(target, elements_list):
@@ -180,7 +184,6 @@ def paralell_analysis(function, directory_list, num_process):
         pool.close()
         pool.join()
 
-
 #---------------------------------------------------------------------------------
 def analysis_unitcell(piseset, calc_info, analysis_info):
     #unitcellが解析済みかどうか確認
@@ -228,7 +231,7 @@ def analysis_unitcell(piseset, calc_info, analysis_info):
         os.chdir("../")
 
     #dos.pdfを作成
-    if os.path.isdir("dos") and not os.path.isfile(f"{band}/dos.pdf"):
+    if os.path.isdir("dos") and not os.path.isfile("dos/dos.pdf"):
         os.chdir("dos")
         subprocess.run(["vise pd"], shell=True)
         os.chdir("../")
