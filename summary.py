@@ -53,7 +53,7 @@ class Summury():
                 summary_info = defaultdict(dict)
 
                 if target_material.material_id != "None":
-                    summary_info["symmetry"] = symmetry_info[target_material.material_id]
+                    summary_info["space group"] = symmetry_info[target_material.material_id]
 
                 summary_info["formula_pretty"] = target_material.formula_pretty
                 summary_info["material_id"] = target_material.material_id
@@ -67,9 +67,14 @@ class Summury():
                 #unitcellの情報を集める
                 poscar = Poscar.from_file("unitcell/opt/POSCAR-finish")
                 poscar_dict = poscar.as_dict()
+                with open("poscar_dict.json", "w") as f:
+                    json.dump(poscar_dict, f, indent=4)
                 summary_info["POSCAR"]["a"] = format(poscar_dict["structure"]["lattice"]["a"], ".3f")
                 summary_info["POSCAR"]["b"] = format(poscar_dict["structure"]["lattice"]["b"], ".3f")
                 summary_info["POSCAR"]["c"] = format(poscar_dict["structure"]["lattice"]["c"], ".3f")
+                summary_info["POSCAR"]["alpha"] = format(poscar_dict["structure"]["lattice"]["alpha"], ".3f")
+                summary_info["POSCAR"]["beta"] = format(poscar_dict["structure"]["lattice"]["beta"], ".3f")
+                summary_info["POSCAR"]["gamma"] = format(poscar_dict["structure"]["lattice"]["gamma"], ".3f")
                 summary_info["POSCAR"]["n_atoms"] = sum(poscar.natoms)
 
                 vasprun = Vasprun("unitcell/opt/vasprun.xml")
